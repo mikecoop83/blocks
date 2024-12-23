@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -24,6 +25,22 @@ type Board struct {
 
 type Piece struct {
 	Shape [][]bool
+}
+
+func (p Piece) Rotate() Piece {
+	fmt.Println(p.Shape)
+	rotated := Piece{
+		Shape: make([][]bool, len(p.Shape[0])),
+	}
+	for i := range p.Shape[0] {
+		rotated.Shape[i] = make([]bool, len(p.Shape))
+	}
+	for i := range p.Shape {
+		for j := range p.Shape[i] {
+			rotated.Shape[j][len(p.Shape)-1-i] = p.Shape[i][j]
+		}
+	}
+	return rotated
 }
 
 func NewBoard() Board {

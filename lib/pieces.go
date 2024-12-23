@@ -16,13 +16,13 @@ func init() {
 		/* 4 */ parsePiece("#####"),
 		/* 5 */ parsePiece("##\n##"),
 		/* 6 */ parsePiece("###\n###\n###"),
-		/* 7 */ parsePiece("###\n #"),
-		/* 8 */ parsePiece("#\n#\n##"),
+		/* 7 */ parsePiece("###\n # "),
+		/* 8 */ parsePiece("# \n# \n##"),
 		/* 9 */ parsePiece(" #\n #\n##"),
-		/* 10 */ parsePiece(" ##\n##"),
-		/* 11 */ parsePiece("##\n ##"),
+		/* 10 */ parsePiece(" ##\n## "),
+		/* 11 */ parsePiece("## \n ##"),
 		/* 12 */ parsePiece("##\n #"),
-		/* 13 */ parsePiece("#\n##"),
+		/* 13 */ parsePiece("# \n##"),
 	}
 }
 

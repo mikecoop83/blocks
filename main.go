@@ -34,6 +34,10 @@ func mainWithError() error {
 outer:
 	for {
 		piece := lib.AllPieces[rand.Intn(len(lib.AllPieces))]
+		rotateTimes := rand.Intn(4)
+		for i := 0; i < rotateTimes; i++ {
+			piece = piece.Rotate()
+		}
 		loc := lib.Location{}
 	inner:
 		for {
