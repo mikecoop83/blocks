@@ -15,9 +15,9 @@ const (
 	Occupied
 )
 
-const boardSize = 8
+const BoardSize = 8
 
-type Grid [boardSize][boardSize]CellState
+type Grid [BoardSize][BoardSize]CellState
 
 type Board struct {
 	gridHistory *Stack[Grid]
@@ -77,7 +77,7 @@ func (b *Board) ValidatePiece(
 	for i := range piece.Shape {
 		for j := range piece.Shape[i] {
 			if piece.Shape[i][j] {
-				if loc.X+i >= boardSize || loc.Y+j >= boardSize {
+				if loc.X+i >= BoardSize || loc.Y+j >= BoardSize {
 					return false
 				}
 				if allowPieceOverlap {
@@ -94,7 +94,7 @@ func (b *Board) ValidatePiece(
 
 func (b *Board) AddPiece(pieceLoc PieceLocation, pending bool) (Grid, bool) {
 	if !b.ValidatePiece(pieceLoc, pending) {
-		return Grid{}, false
+		return b.GetGrid(), false
 	}
 	grid, ok := b.gridHistory.Peek()
 	if !ok {
@@ -130,9 +130,9 @@ func (b *Board) AddPiece(pieceLoc PieceLocation, pending bool) (Grid, bool) {
 	}
 
 	// Find full horizontal lines
-	for i := 0; i < boardSize; i++ {
+	for i := 0; i < BoardSize; i++ {
 		full := true
-		for j := 0; j < boardSize; j++ {
+		for j := 0; j < BoardSize; j++ {
 			if grid[i][j] != Occupied && grid[i][j] != Pending {
 				full = false
 				break
@@ -141,14 +141,14 @@ func (b *Board) AddPiece(pieceLoc PieceLocation, pending bool) (Grid, bool) {
 		if !full {
 			continue
 		}
-		for j := 0; j < boardSize; j++ {
+		for j := 0; j < BoardSize; j++ {
 			grid[i][j] = newFullLineState
 		}
 	}
 	// Find full vertical lines
-	for j := 0; j < boardSize; j++ {
+	for j := 0; j < BoardSize; j++ {
 		full := true
-		for i := 0; i < boardSize; i++ {
+		for i := 0; i < BoardSize; i++ {
 			if grid[i][j] != Occupied && grid[i][j] != Pending {
 				full = false
 				break
@@ -157,7 +157,7 @@ func (b *Board) AddPiece(pieceLoc PieceLocation, pending bool) (Grid, bool) {
 		if !full {
 			continue
 		}
-		for i := 0; i < boardSize; i++ {
+		for i := 0; i < BoardSize; i++ {
 			grid[i][j] = newFullLineState
 		}
 	}
