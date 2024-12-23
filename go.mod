@@ -1,4 +1,4 @@
-module blocks
+module github.com/mikecoop83/blocks
 
 go 1.23
 

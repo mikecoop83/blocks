@@ -1,9 +1,10 @@
 package main
 
 import (
-	"blocks/lib"
 	"fmt"
 	"math/rand"
+
+	"github.com/mikecoop83/blocks/lib"
 
 	"github.com/eiannone/keyboard"
 )

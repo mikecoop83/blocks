@@ -1,11 +1,11 @@
 package main
 
 import (
-	"blocks/lib"
-	"fmt"
 	"image/color"
 	"log"
 	"math/rand"
+
+	"github.com/mikecoop83/blocks/lib"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
@@ -69,10 +69,6 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		adjustedX := mouseX - pieceWidth*cellSize/2
 		adjustedY := mouseY - pieceHeight*cellSize/2
 		cellX, cellY := adjustedX/cellSize, adjustedY/cellSize
-		fmt.Printf(
-			"mouse %d,%d, piece size %d,%d, adjusted %d,%d, cell %d,%d\n",
-			mouseX, mouseY, pieceWidth, pieceHeight, adjustedX, adjustedY, cellX, cellY,
-		)
 		// Clamp the piece to the board.
 		if cellX < 0 {
 			cellX = 0
@@ -86,7 +82,6 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		if cellY > lib.BoardSize-pieceHeight {
 			cellY = lib.BoardSize - pieceHeight
 		}
-		fmt.Printf("cellX: %d, cellY: %d\n", cellX, cellY)
 
 		pending := true
 		pressed := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
@@ -108,7 +103,6 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		if valid && !pending {
 			g.currentPiece = nil
 		}
-		fmt.Printf("valid: %v, pending: %v\n", valid, pending)
 	}
 	for c := range grid {
 		for r := range grid[c] {

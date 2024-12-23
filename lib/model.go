@@ -1,7 +1,6 @@
 package lib
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -28,7 +27,6 @@ type Piece struct {
 }
 
 func (p Piece) Rotate() Piece {
-	fmt.Println(p.Shape)
 	rotated := Piece{
 		Shape: make([][]bool, len(p.Shape[0])),
 	}
@@ -142,7 +140,9 @@ func (b *Board) AddPiece(pieceLoc PieceLocation, pending bool) (Grid, bool) {
 			continue
 		}
 		for j := 0; j < BoardSize; j++ {
-			grid[i][j] = newFullLineState
+			if grid[i][j] != Pending {
+				grid[i][j] = newFullLineState
+			}
 		}
 	}
 	// Find full vertical lines
@@ -158,7 +158,9 @@ func (b *Board) AddPiece(pieceLoc PieceLocation, pending bool) (Grid, bool) {
 			continue
 		}
 		for i := 0; i < BoardSize; i++ {
-			grid[i][j] = newFullLineState
+			if grid[i][j] != Pending {
+				grid[i][j] = newFullLineState
+			}
 		}
 	}
 	if !pending {
