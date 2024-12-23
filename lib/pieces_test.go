@@ -7,5 +7,5 @@ import (
 )
 
 func TestParsePieces(t *testing.T) {
-	require.Equal(t, Piece{Shape: [][]byte{{0, 1, 0}}}, parsePiece(" # "))
+	require.Equal(t, Piece{Shape: [][]bool{{false, true, false}, {true, true, true}}}, parsePiece(" # \n###"))
 }

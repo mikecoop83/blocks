@@ -9,35 +9,34 @@ var AllPieces []Piece
 
 func init() {
 	AllPieces = []Piece{
-		parsePiece("#"),
-		parsePiece("##"),
-		parsePiece("###"),
-		parsePiece("####"),
-		parsePiece("#####"),
-		parsePiece("##\n##"),
-		parsePiece("###\n###\n###"),
-		parsePiece("###\n #"),
-		parsePiece("#\n#\n##"),
-		parsePiece(" #\n #\n##"),
-		parsePiece(" ##\n##"),
-		parsePiece("##\n ##"),
-		parsePiece("##\n #"),
-		parsePiece("#\n##"),
+		/* 0 */ parsePiece("#"),
+		/* 1 */ parsePiece("##"),
+		/* 2 */ parsePiece("###"),
+		/* 3 */ parsePiece("####"),
+		/* 4 */ parsePiece("#####"),
+		/* 5 */ parsePiece("##\n##"),
+		/* 6 */ parsePiece("###\n###\n###"),
+		/* 7 */ parsePiece("###\n #"),
+		/* 8 */ parsePiece("#\n#\n##"),
+		/* 9 */ parsePiece(" #\n #\n##"),
+		/* 10 */ parsePiece(" ##\n##"),
+		/* 11 */ parsePiece("##\n ##"),
+		/* 12 */ parsePiece("##\n #"),
+		/* 13 */ parsePiece("#\n##"),
 	}
 }
+
 func parsePiece(pieceStr string) Piece {
 	rows := strings.Split(pieceStr, "\n")
-	shape := make([][]byte, 0, len(rows))
+	shape := make([][]bool, 0, len(rows))
 	for _, row := range rows {
 		if len(row) == 0 {
 			continue
 		}
-		pieceRow := make([]byte, 0, len(row))
-		for _, c := range row {
-			if c == ' ' {
-				pieceRow = append(pieceRow, 0)
-			} else {
-				pieceRow = append(pieceRow, 1)
+		pieceRow := make([]bool, len(row))
+		for i, c := range row {
+			if c != ' ' {
+				pieceRow[i] = true
 			}
 		}
 		shape = append(shape, pieceRow)
