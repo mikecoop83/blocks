@@ -17,6 +17,7 @@ type Game struct {
 
 	currentPiece              *lib.Piece
 	leftMouseButtonWasPressed bool
+	keyWasPressed             ebiten.Key
 }
 
 // Update is called every tick (1/60 seconds by default) to update the game state.
@@ -28,6 +29,15 @@ func (g *Game) Update() error {
 	}
 	if !g.leftMouseButtonWasPressed && ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
 		g.leftMouseButtonWasPressed = true
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyN) {
+		g.keyWasPressed = ebiten.KeyN
+	} else {
+		if !ebiten.IsKeyPressed(g.keyWasPressed) && g.keyWasPressed == ebiten.KeyN {
+			piece := lib.AllPieces[rand.Intn(len(lib.AllPieces))]
+			g.currentPiece = &piece
+			g.keyWasPressed = 0
+		}
 	}
 	return nil
 }
