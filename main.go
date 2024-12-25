@@ -24,12 +24,20 @@ func (g *Game) Update() error {
 	if g.currentPiece == nil {
 		randPieceIdx := rand.Intn(len(lib.AllPieces))
 		piece := lib.AllPieces[randPieceIdx]
+		rotateTimes := rand.Intn(4)
+		for i := 0; i < rotateTimes; i++ {
+			piece = piece.Rotate()
+		}
 		g.currentPiece = &piece
 	}
 
+	// Cheats...
 	if inpututil.IsKeyJustReleased(ebiten.KeyN) {
 		piece := lib.AllPieces[rand.Intn(len(lib.AllPieces))]
 		g.currentPiece = &piece
+	}
+	if inpututil.IsKeyJustReleased(ebiten.KeyR) {
+		*g.currentPiece = g.currentPiece.Rotate()
 	}
 	return nil
 }
@@ -85,10 +93,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			cellY = lib.BoardSize - pieceHeight
 		}
 
-		pending := true
-		if inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft) {
-			pending = false
-		}
+		pending := !inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft)
 
 		pendingGrid, valid := g.board.AddPiece(
 			lib.PieceLocation{

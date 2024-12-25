@@ -62,6 +62,18 @@ func (b *Board) Clear() {
 	b.gridHistory = NewStack[Grid]()
 }
 
+func (b *Board) CanPlacePiece(piece Piece) bool {
+	for i := range piece.Shape {
+		for j := range piece.Shape[i] {
+			loc := Location{X: i, Y: j}
+			if b.ValidatePiece(PieceLocation{Piece: piece, Loc: loc}, false) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (b *Board) ValidatePiece(
 	pieceLoc PieceLocation,
 	allowPieceOverlap bool,
