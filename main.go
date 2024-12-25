@@ -5,6 +5,7 @@ import (
 	"log"
 	"math/rand"
 
+	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/mikecoop83/blocks/lib"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -15,9 +16,7 @@ import (
 type Game struct {
 	board *lib.Board
 
-	currentPiece              *lib.Piece
-	leftMouseButtonWasPressed bool
-	keyWasPressed             ebiten.Key
+	currentPiece *lib.Piece
 }
 
 // Update is called every tick (1/60 seconds by default) to update the game state.
@@ -27,17 +26,10 @@ func (g *Game) Update() error {
 		piece := lib.AllPieces[randPieceIdx]
 		g.currentPiece = &piece
 	}
-	if !g.leftMouseButtonWasPressed && ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
-		g.leftMouseButtonWasPressed = true
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyN) {
-		g.keyWasPressed = ebiten.KeyN
-	} else {
-		if !ebiten.IsKeyPressed(g.keyWasPressed) && g.keyWasPressed == ebiten.KeyN {
-			piece := lib.AllPieces[rand.Intn(len(lib.AllPieces))]
-			g.currentPiece = &piece
-			g.keyWasPressed = 0
-		}
+
+	if inpututil.IsKeyJustReleased(ebiten.KeyN) {
+		piece := lib.AllPieces[rand.Intn(len(lib.AllPieces))]
+		g.currentPiece = &piece
 	}
 	return nil
 }
@@ -94,9 +86,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		}
 
 		pending := true
-		pressed := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
-		if !pressed && g.leftMouseButtonWasPressed {
-			g.leftMouseButtonWasPressed = false
+		if inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft) {
 			pending = false
 		}
 
