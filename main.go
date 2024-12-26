@@ -5,11 +5,16 @@ import (
 	"log"
 	"math/rand"
 
-	"github.com/hajimehoshi/ebiten/v2/inpututil"
-	"github.com/mikecoop83/blocks/lib"
+	"golang.org/x/image/font"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/inpututil"
+	"github.com/hajimehoshi/ebiten/v2/text"
 	"github.com/hajimehoshi/ebiten/v2/vector"
+	"github.com/mikecoop83/blocks/lib"
+	"github.com/mikecoop83/blocks/resources"
 )
 
 // Game struct represents the game state.
@@ -18,6 +23,12 @@ type Game struct {
 
 	pieceOptions   [3]*lib.Piece
 	chosenPieceIdx int
+
+	score int64
+}
+
+func (g *Game) Score() int64 {
+	return g.score
 }
 
 func (g *Game) chosenPiece() *lib.Piece {
@@ -72,6 +83,7 @@ var paleYellow = color.RGBA{R: 0xff, G: 0xff, B: 0xcc, A: 0xff}
 
 const (
 	cellSize         = 100
+	topAreaHeight    = 100
 	boardWidth       = lib.BoardSize * cellSize
 	boardHeight      = lib.BoardSize * cellSize
 	bottomAreaHeight = lib.BoardSize * cellSize * 0.5
@@ -87,10 +99,11 @@ var cellStateToColor = map[lib.CellState]color.Color{
 	lib.Hovering: paleYellow,
 }
 
+var commaFormatter = message.NewPrinter(language.English)
+
 // Draw is called every frame to render the screen.
 func (g *Game) Draw(screen *ebiten.Image) {
 	mouseX, mouseY := ebiten.CursorPosition()
-	mouseOnBoard := mouseX >= 0 && mouseX < boardWidth && mouseY >= 0 && mouseY < boardHeight
 	// Draw the background.
 	vector.DrawFilledRect(
 		screen,
@@ -100,22 +113,48 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		white,
 		false,
 	)
+	const topAreaOffset = 0
+	// Draw the top area with the score.
+	msg := commaFormatter.Sprintf("Score: %d", g.Score())
+	bounds, _ := font.BoundString(resources.FontFace, msg)
 
+	// Calculate text width and height
+	textWidth := (bounds.Max.X - bounds.Min.X) >> 6
+	textHeight := (bounds.Max.Y - bounds.Min.Y) >> 6
+
+	// Calculate the center position
+	textX := (boardWidth - textWidth) / 2
+	textY := (topAreaHeight - textHeight) / 2
+
+	// Adjust for baseline alignment
+	textY += textHeight
+	text.Draw(
+		screen,
+		msg,
+		resources.FontFace,
+		int(textX), int(topAreaOffset+textY),
+		color.Black,
+	)
+
+	const boardYOffset = topAreaHeight
+	mouseOnBoard := mouseX >= 0 && mouseX < boardWidth && mouseY >= boardYOffset && mouseY < boardYOffset+boardHeight
 	// Draw gridlines
 	var gridColor = color.Gray16{Y: 0xBBBB}
 	for i := 0; i <= lib.BoardSize; i++ {
+		// Horizontal line
 		vector.StrokeLine(
 			screen,
-			float32(i*cellSize), 0,
-			float32(i*cellSize), boardHeight,
+			float32(i*cellSize), float32(boardYOffset),
+			float32(i*cellSize), float32(boardYOffset+boardHeight),
 			1,
 			gridColor,
 			false,
 		)
+		// Vertical line
 		vector.StrokeLine(
 			screen,
-			0, float32(i*cellSize),
-			boardWidth, float32(i*cellSize),
+			0, float32(boardYOffset+i*cellSize),
+			boardWidth, float32(boardYOffset+i*cellSize),
 			1,
 			gridColor,
 			false,
@@ -126,7 +165,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	if mouseOnBoard && g.chosenPiece() != nil {
 		piece := *g.chosenPiece()
 		cellC := mouseX / cellSize
-		cellR := mouseY / cellSize
+		cellR := (mouseY - boardYOffset) / cellSize
 
 		// Clamp the piece to the board if the mouse is on the board
 		if cellC < 0 {
@@ -165,7 +204,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			cellColor := cellStateToColor[state]
 			vector.DrawFilledRect(
 				screen,
-				float32(c*cellSize), float32(r*cellSize),
+				float32(c*cellSize), float32(boardYOffset+r*cellSize),
 				cellSize, cellSize,
 				cellColor,
 				false,
@@ -173,7 +212,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			// Draw rectangle around each filled cell.
 			vector.StrokeRect(
 				screen,
-				float32(c*cellSize), float32(r*cellSize),
+				float32(c*cellSize), float32(boardYOffset+r*cellSize),
 				cellSize, cellSize,
 				1,
 				color.Black,
@@ -182,6 +221,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		}
 	}
 
+	// Draw the bottom area with the piece options
+	const bottomAreaOffset = topAreaHeight + boardHeight
 	const pieceOptionCellSize = cellSize * 0.5
 	pieceOptionWidth := boardWidth / 3
 	for p, piece := range g.pieceOptions {
@@ -196,7 +237,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		xOffset := (pieceOptionWidth - piece.Width()*pieceOptionCellSize) / 2
 		// If the mouse is hovering over an unselected piece, change the color.  Select it if it was just clicked.
 		pieceX := xOffset + p*pieceOptionWidth
-		pieceY := yOffset + boardHeight
+		pieceY := bottomAreaOffset + yOffset
 		if g.chosenPieceIdx != p &&
 			mouseX >= pieceX && mouseX < pieceX+piece.Width()*pieceOptionCellSize &&
 			mouseY >= pieceY && mouseY < pieceY+piece.Height()*pieceOptionCellSize {
@@ -237,7 +278,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 // Layout returns the logical screen dimensions. The game window will scale to fit this size.
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
-	return boardWidth, boardHeight + bottomAreaHeight
+	return boardWidth, topAreaHeight + boardHeight + bottomAreaHeight
 }
 
 func main() {
