@@ -59,6 +59,9 @@ type Game struct {
 	clearedRows [lib.BoardSize]*animatedEntity
 	clearedCols [lib.BoardSize]*animatedEntity
 
+	mouseX int
+	mouseY int
+
 	score    int64
 	gameOver bool
 }
@@ -88,6 +91,7 @@ func getRandomRotatedPiece() *lib.Piece {
 
 // Update is called every tick (1/60 seconds by default) to tick the game state.
 func (g *Game) Update() error {
+	g.mouseX, g.mouseY = ebiten.CursorPosition()
 	if inpututil.IsKeyJustReleased(ebiten.KeyQ) {
 		return ebiten.Termination
 	}
@@ -151,7 +155,6 @@ outer:
 
 // Draw is called every frame to render the screen.
 func (g *Game) Draw(screen *ebiten.Image) {
-	mouseX, mouseY := ebiten.CursorPosition()
 	// Draw the background.
 	vector.DrawFilledRect(
 		screen,
@@ -217,7 +220,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		)
 	}
 
-	mouseOnBoard := mouseX >= 0 && mouseX < boardWidth && mouseY >= boardYOffset && mouseY < boardYOffset+boardHeight
+	mouseOnBoard := g.mouseX >= 0 && g.mouseX < boardWidth && g.mouseY >= boardYOffset && g.mouseY < boardYOffset+boardHeight
 	// Draw gridlines
 	var gridColor = color.Gray16{Y: 0xBBBB}
 	for i := 0; i <= lib.BoardSize; i++ {
@@ -244,8 +247,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	grid := g.board.GetGrid()
 	if mouseOnBoard && g.chosenPiece() != nil {
 		piece := *g.chosenPiece()
-		cellC := mouseX / cellSize
-		cellR := (mouseY - boardYOffset) / cellSize
+		cellC := g.mouseX / cellSize
+		cellR := (g.mouseY - boardYOffset) / cellSize
 
 		// Clamp the piece to the board if the mouse is on the board
 		if cellC < 0 {
@@ -337,8 +340,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		pieceX := xOffset + p*pieceOptionWidth
 		pieceY := bottomAreaOffset + yOffset
 		if g.chosenPieceIdx != p &&
-			mouseX >= pieceX && mouseX < pieceX+piece.Width()*pieceOptionCellSize &&
-			mouseY >= pieceY && mouseY < pieceY+piece.Height()*pieceOptionCellSize {
+			g.mouseX >= pieceX && g.mouseX < pieceX+piece.Width()*pieceOptionCellSize &&
+			g.mouseY >= pieceY && g.mouseY < pieceY+piece.Height()*pieceOptionCellSize {
 			pieceOptionColor = cellStateToColor[lib.Hovering]
 			if inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft) {
 				g.chosenPieceIdx = p
