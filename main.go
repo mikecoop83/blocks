@@ -27,10 +27,6 @@ type Game struct {
 	score int64
 }
 
-func (g *Game) Score() int64 {
-	return g.score
-}
-
 func (g *Game) chosenPiece() *lib.Piece {
 	return g.pieceOptions[g.chosenPieceIdx]
 }
@@ -115,7 +111,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	)
 	const topAreaOffset = 0
 	// Draw the top area with the score.
-	msg := commaFormatter.Sprintf("Score: %d", g.Score())
+	msg := commaFormatter.Sprintf("Score: %d", g.score)
 	bounds, _ := font.BoundString(resources.FontFace, msg)
 
 	// Calculate text width and height
@@ -181,7 +177,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			cellR = lib.BoardSize - piece.Height()
 		}
 		pending := !inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft)
-		pendingGrid, valid := g.board.AddPiece(
+		pendingGrid, clearedLines, valid := g.board.AddPiece(
 			lib.PieceLocation{
 				Piece: piece,
 				Loc:   lib.Location{C: cellC, R: cellR},
@@ -192,6 +188,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			grid = pendingGrid
 		}
 		if valid && !pending {
+			numPoints := g.chosenPiece().NumBlocks()
+			numPoints += clearedLines * 10
+			g.score += int64(numPoints)
 			g.pieceOptions[g.chosenPieceIdx] = nil
 		}
 	}

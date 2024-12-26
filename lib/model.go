@@ -71,6 +71,18 @@ func (p Piece) Rotate() Piece {
 	return rotated
 }
 
+func (p Piece) NumBlocks() int {
+	var numBlocks int
+	for r := range p.Shape {
+		for c := range p.Shape[r] {
+			if p.Shape[r][c] {
+				numBlocks++
+			}
+		}
+	}
+	return numBlocks
+}
+
 func NewBoard() Board {
 	gridHistory := NewStack[Grid]()
 	gridHistory.Push(Grid{})
@@ -135,9 +147,9 @@ func (b *Board) ValidatePiece(
 	return true
 }
 
-func (b *Board) AddPiece(pieceLoc PieceLocation, pending bool) (Grid, bool) {
+func (b *Board) AddPiece(pieceLoc PieceLocation, pending bool) (Grid, int, bool) {
 	if !b.ValidatePiece(pieceLoc, pending) {
-		return b.GetGrid(), false
+		return b.GetGrid(), 0, false
 	}
 	grid, ok := b.gridHistory.Peek()
 	if !ok {
@@ -169,9 +181,10 @@ func (b *Board) AddPiece(pieceLoc PieceLocation, pending bool) (Grid, bool) {
 		}
 	}
 	if anyInvalid {
-		return grid, false
+		return grid, 0, false
 	}
 
+	var clearedLines int
 	// Find full horizontal lines
 	for r := range BoardSize {
 		full := true
@@ -184,6 +197,7 @@ func (b *Board) AddPiece(pieceLoc PieceLocation, pending bool) (Grid, bool) {
 		if !full {
 			continue
 		}
+		clearedLines++
 		for c := range BoardSize {
 			if grid[r][c] != Pending {
 				grid[r][c] = newFullLineState
@@ -202,6 +216,7 @@ func (b *Board) AddPiece(pieceLoc PieceLocation, pending bool) (Grid, bool) {
 		if !full {
 			continue
 		}
+		clearedLines++
 		for r := range BoardSize {
 			if grid[r][c] != Pending {
 				grid[r][c] = newFullLineState
@@ -211,7 +226,7 @@ func (b *Board) AddPiece(pieceLoc PieceLocation, pending bool) (Grid, bool) {
 	if !pending {
 		b.gridHistory.Push(grid)
 	}
-	return grid, true
+	return grid, clearedLines, true
 }
 
 func (b *Board) Undo() bool {
