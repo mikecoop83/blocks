@@ -63,6 +63,15 @@ type Game struct {
 	gameOver bool
 }
 
+func (g *Game) Reset() {
+	g.pieceOptions = [numPieceOptions]*lib.Piece{}
+	g.chosenPieceIdx = 0
+	g.score = 0
+	g.gameOver = false
+	newBoard := lib.NewBoard()
+	g.board = &newBoard
+}
+
 func (g *Game) chosenPiece() *lib.Piece {
 	return g.pieceOptions[g.chosenPieceIdx]
 }
@@ -79,6 +88,13 @@ func getRandomRotatedPiece() *lib.Piece {
 
 // Update is called every tick (1/60 seconds by default) to tick the game state.
 func (g *Game) Update() error {
+	if inpututil.IsKeyJustReleased(ebiten.KeyQ) {
+		return ebiten.Termination
+	}
+	if inpututil.IsKeyJustReleased(ebiten.KeyR) {
+		g.Reset()
+	}
+
 	// If the chosen piece is nil, choose the first available piece.
 	if g.chosenPiece() == nil {
 		for i := 0; i < len(g.pieceOptions); i++ {
