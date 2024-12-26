@@ -4,6 +4,7 @@ import (
 	"image/color"
 	"log"
 	"math/rand"
+	"time"
 
 	"golang.org/x/image/font"
 	"golang.org/x/text/language"
@@ -17,69 +18,20 @@ import (
 	"github.com/mikecoop83/blocks/resources"
 )
 
-// Game struct represents the game state.
-type Game struct {
-	board *lib.Board
-	
-	pieceOptions   [3]*lib.Piece
-	chosenPieceIdx int
-
-	score int64
-}
-
-func (g *Game) chosenPiece() *lib.Piece {
-	return g.pieceOptions[g.chosenPieceIdx]
-}
-
-func getRandomRotatedPiece() *lib.Piece {
-	randPieceIdx := rand.Intn(len(lib.AllPieces))
-	piece := lib.AllPieces[randPieceIdx]
-	rotateTimes := rand.Intn(4)
-	for i := 0; i < rotateTimes; i++ {
-		piece = piece.Rotate()
-	}
-	return &piece
-}
-
-// Update is called every tick (1/60 seconds by default) to update the game state.
-func (g *Game) Update() error {
-	// If the chosen piece is nil, choose the first available piece.
-	if g.chosenPiece() == nil {
-		for i := 0; i < len(g.pieceOptions); i++ {
-			if g.pieceOptions[i] != nil {
-				g.chosenPieceIdx = i
-				break
-			}
-		}
-	}
-	// If none left, get 3 new pieces and set first piece to be chosen.
-	if g.chosenPiece() == nil {
-		for i := 0; i < 3; i++ {
-			g.pieceOptions[i] = getRandomRotatedPiece()
-		}
-		g.chosenPieceIdx = 0
-	}
-
-	// Cheats...
-	if inpututil.IsKeyJustReleased(ebiten.KeyS) {
-		for i := 0; i < len(g.pieceOptions); i++ {
-			g.pieceOptions[i] = getRandomRotatedPiece()
-		}
-	}
-	return nil
-}
-
-var white = color.RGBA{R: 0xf0, G: 0xf0, B: 0xf0, A: 0xff}
-var green = color.RGBA{R: 0x00, G: 0xcc, B: 0x66, A: 0xff}
-var red = color.RGBA{R: 0xff, G: 0x66, B: 0x66, A: 0xff}
-var blue = color.RGBA{R: 0x66, G: 0x99, B: 0xff, A: 0xff}
-var orange = color.RGBA{R: 0xff, G: 0xa5, B: 0x00, A: 0xff}
-var gray = color.RGBA{R: 0x80, G: 0x80, B: 0x80, A: 0xff}
-var paleYellow = color.RGBA{R: 0xff, G: 0xff, B: 0xcc, A: 0xff}
+var (
+	white      = color.RGBA{R: 0xf0, G: 0xf0, B: 0xf0, A: 0xff}
+	green      = color.RGBA{R: 0x00, G: 0xcc, B: 0x66, A: 0xff}
+	red        = color.RGBA{R: 0xff, G: 0x66, B: 0x66, A: 0xff}
+	blue       = color.RGBA{R: 0x66, G: 0x99, B: 0xff, A: 0xff}
+	orange     = color.RGBA{R: 0xff, G: 0xa5, B: 0x00, A: 0xff}
+	gray       = color.RGBA{R: 0x80, G: 0x80, B: 0x80, A: 0xff}
+	paleYellow = color.RGBA{R: 0xff, G: 0xff, B: 0xcc, A: 0xff}
+)
 
 const (
 	cellSize         = 100
 	topAreaHeight    = 100
+	numPieceOptions  = 3
 	boardWidth       = lib.BoardSize * cellSize
 	boardHeight      = lib.BoardSize * cellSize
 	bottomAreaHeight = lib.BoardSize * cellSize * 0.5
@@ -97,6 +49,90 @@ var cellStateToColor = map[lib.CellState]color.Color{
 
 var commaFormatter = message.NewPrinter(language.English)
 
+// Game struct represents the game state.
+type Game struct {
+	board *lib.Board
+
+	pieceOptions   [numPieceOptions]*lib.Piece
+	chosenPieceIdx int
+
+	clearedRows [lib.BoardSize]*animatedEntity
+	clearedCols [lib.BoardSize]*animatedEntity
+
+	score    int64
+	gameOver bool
+}
+
+func (g *Game) chosenPiece() *lib.Piece {
+	return g.pieceOptions[g.chosenPieceIdx]
+}
+
+func getRandomRotatedPiece() *lib.Piece {
+	randPieceIdx := rand.Intn(len(lib.AllPieces))
+	piece := lib.AllPieces[randPieceIdx]
+	rotateTimes := rand.Intn(4)
+	for i := 0; i < rotateTimes; i++ {
+		piece = piece.Rotate()
+	}
+	return &piece
+}
+
+// Update is called every tick (1/60 seconds by default) to tick the game state.
+func (g *Game) Update() error {
+	// If the chosen piece is nil, choose the first available piece.
+	if g.chosenPiece() == nil {
+		for i := 0; i < len(g.pieceOptions); i++ {
+			if g.pieceOptions[i] != nil {
+				g.chosenPieceIdx = i
+				break
+			}
+		}
+	}
+	// If none left, get numPieceOptions new pieces and set first piece to be chosen.
+	if g.chosenPiece() == nil {
+		for i := 0; i < numPieceOptions; i++ {
+			g.pieceOptions[i] = getRandomRotatedPiece()
+		}
+		g.chosenPieceIdx = 0
+	}
+	// Check if the game is over.
+	var hasValidMove bool
+outer:
+	for _, piece := range g.pieceOptions {
+		if piece == nil {
+			continue
+		}
+		for r := range lib.BoardSize - piece.Height() {
+			for c := range lib.BoardSize - piece.Width() {
+				pieceLoc := lib.PieceLocation{
+					Piece: *piece,
+					Loc:   lib.Location{C: c, R: r},
+				}
+				if g.board.ValidatePiece(pieceLoc, false) {
+					hasValidMove = true
+					break outer
+				}
+			}
+		}
+	}
+	if !hasValidMove {
+		g.gameOver = true
+	}
+
+	// Update the animations for cleared rows and columns.
+	for _, rowsAndColumns := range [2][lib.BoardSize]*animatedEntity{g.clearedRows, g.clearedCols} {
+		for i, entity := range rowsAndColumns {
+			if entity == nil {
+				continue
+			}
+			if entity.tick() {
+				rowsAndColumns[i] = nil
+			}
+		}
+	}
+	return nil
+}
+
 // Draw is called every frame to render the screen.
 func (g *Game) Draw(screen *ebiten.Image) {
 	mouseX, mouseY := ebiten.CursorPosition()
@@ -112,6 +148,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	const topAreaOffset = 0
 	// Draw the top area with the score.
 	msg := commaFormatter.Sprintf("Score: %d", g.score)
+
+	if g.gameOver {
+		msg = "Game Over! " + msg
+	}
+
 	bounds, _ := font.BoundString(resources.FontFace, msg)
 
 	// Calculate text width and height
@@ -133,6 +174,33 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	)
 
 	const boardYOffset = topAreaHeight
+
+	// Animate the cleared rows and columns
+	for r, entity := range g.clearedRows {
+		if entity == nil {
+			continue
+		}
+		vector.DrawFilledRect(
+			screen,
+			0, float32(boardYOffset+r*cellSize),
+			boardWidth, cellSize,
+			entity.currentColor,
+			false,
+		)
+	}
+	for c, entity := range g.clearedCols {
+		if entity == nil {
+			continue
+		}
+		vector.DrawFilledRect(
+			screen,
+			float32(c*cellSize), float32(boardYOffset),
+			cellSize, boardHeight,
+			entity.currentColor,
+			false,
+		)
+	}
+
 	mouseOnBoard := mouseX >= 0 && mouseX < boardWidth && mouseY >= boardYOffset && mouseY < boardYOffset+boardHeight
 	// Draw gridlines
 	var gridColor = color.Gray16{Y: 0xBBBB}
@@ -191,6 +259,20 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			numPoints := g.chosenPiece().NumBlocks()
 			numClearedLines := len(clearedRows) + len(clearedCols)
 			numPoints += numClearedLines * 10
+			for _, r := range clearedRows {
+				g.clearedRows[r] = &animatedEntity{
+					currentColor:  cellStateToColor[lib.FullLine],
+					targetColor:   cellStateToColor[lib.Empty],
+					animationTime: 3 * time.Second,
+				}
+			}
+			for _, c := range clearedCols {
+				g.clearedCols[c] = &animatedEntity{
+					currentColor:  cellStateToColor[lib.FullLine],
+					targetColor:   cellStateToColor[lib.Empty],
+					animationTime: 3 * time.Second,
+				}
+			}
 			g.score += int64(numPoints)
 			g.pieceOptions[g.chosenPieceIdx] = nil
 		}
@@ -224,7 +306,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// Draw the bottom area with the piece options
 	const bottomAreaOffset = topAreaHeight + boardHeight
 	const pieceOptionCellSize = cellSize * 0.5
-	pieceOptionWidth := boardWidth / 3
+	pieceOptionWidth := boardWidth / numPieceOptions
 	for p, piece := range g.pieceOptions {
 		if piece == nil {
 			continue
