@@ -89,6 +89,8 @@ var cellStateToColor = map[lib.CellState]color.Color{
 
 // Draw is called every frame to render the screen.
 func (g *Game) Draw(screen *ebiten.Image) {
+	mouseX, mouseY := ebiten.CursorPosition()
+	mouseOnBoard := mouseX >= 0 && mouseX < boardWidth && mouseY >= 0 && mouseY < boardHeight
 	// Draw the background.
 	vector.DrawFilledRect(
 		screen,
@@ -121,14 +123,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	grid := g.board.GetGrid()
-	if g.chosenPiece() != nil {
+	if mouseOnBoard && g.chosenPiece() != nil {
 		piece := *g.chosenPiece()
-		mouseX, mouseY := ebiten.CursorPosition()
 		cellC := mouseX / cellSize
 		cellR := mouseY / cellSize
-		// cellC = cellC - piece.Width()/2
-		// cellR = cellR - piece.Height()/2
-		// Clamp the piece to the board.
+
+		// Clamp the piece to the board if the mouse is on the board
 		if cellC < 0 {
 			cellC = 0
 		}
@@ -194,6 +194,17 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		}
 		yOffset := (bottomAreaHeight - piece.Height()*pieceOptionCellSize) / 2
 		xOffset := (pieceOptionWidth - piece.Width()*pieceOptionCellSize) / 2
+		// If the mouse is hovering over an unselected piece, change the color.  Select it if it was just clicked.
+		pieceX := xOffset + p*pieceOptionWidth
+		pieceY := yOffset + boardHeight
+		if g.chosenPieceIdx != p &&
+			mouseX >= pieceX && mouseX < pieceX+piece.Width()*pieceOptionCellSize &&
+			mouseY >= pieceY && mouseY < pieceY+piece.Height()*pieceOptionCellSize {
+			pieceOptionColor = cellStateToColor[lib.Hovering]
+			if inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft) {
+				g.chosenPieceIdx = p
+			}
+		}
 		for r := range piece.Shape {
 			for c := range piece.Shape[r] {
 				if !piece.Shape[r][c] {
@@ -201,8 +212,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 				}
 				vector.DrawFilledRect(
 					screen,
-					float32(xOffset+p*pieceOptionWidth+c*pieceOptionCellSize),
-					float32(yOffset+r*pieceOptionCellSize+boardHeight),
+					float32(pieceX+c*pieceOptionCellSize),
+					float32(pieceY+r*pieceOptionCellSize),
 					float32(pieceOptionCellSize),
 					float32(pieceOptionCellSize),
 					pieceOptionColor,
@@ -211,8 +222,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 				// Draw rectangle around each filled cell.
 				vector.StrokeRect(
 					screen,
-					float32(xOffset+p*pieceOptionWidth+c*pieceOptionCellSize),
-					float32(yOffset+r*pieceOptionCellSize+boardHeight),
+					float32(pieceX+c*pieceOptionCellSize),
+					float32(pieceY+r*pieceOptionCellSize),
 					float32(pieceOptionCellSize),
 					float32(pieceOptionCellSize),
 					1,
