@@ -4,7 +4,7 @@ set -e
 # Install Go if not already installed
 if ! [ -x "$(command -v go)" ]; then
   echo "Installing Go for Linux..."
-  wget https://go.dev/dl/go1.23.4.linux-amd64.tar.gz -O go.tar.gz
+  curl -fsSL https://go.dev/dl/go1.23.4.linux-amd64.tar.gz -o go.tar.gz
   tar -xzf go.tar.gz
   export PATH=$PATH:$(pwd)/go/bin
 fi
