@@ -20,6 +20,26 @@ const BoardSize = 8
 
 type Grid [BoardSize][BoardSize]CellState
 
+func (g Grid) String() string {
+	cellStateToIcon := map[CellState]string{
+		Empty:    "e",
+		Pending:  "p",
+		Invalid:  "i",
+		FullLine: "f",
+		Occupied: "o",
+		Unchosen: "u",
+		Hovering: "h",
+	}
+	var sb strings.Builder
+	for _, row := range g {
+		for _, cell := range row {
+			_, _ = sb.WriteString(cellStateToIcon[cell])
+		}
+		sb.WriteString("\n")
+	}
+	return sb.String()
+}
+
 type Board struct {
 	gridHistory *Stack[Grid]
 }
@@ -28,16 +48,24 @@ type Piece struct {
 	Shape [][]bool
 }
 
+func (p Piece) Height() int {
+	return len(p.Shape)
+}
+
+func (p Piece) Width() int {
+	return len(p.Shape[0])
+}
+
 func (p Piece) Rotate() Piece {
 	rotated := Piece{
 		Shape: make([][]bool, len(p.Shape[0])),
 	}
-	for i := range p.Shape[0] {
-		rotated.Shape[i] = make([]bool, len(p.Shape))
+	for c := range p.Shape[0] {
+		rotated.Shape[c] = make([]bool, len(p.Shape))
 	}
-	for i := range p.Shape {
-		for j := range p.Shape[i] {
-			rotated.Shape[j][len(p.Shape)-1-i] = p.Shape[i][j]
+	for r := range p.Shape {
+		for c := range p.Shape[r] {
+			rotated.Shape[c][len(p.Shape)-1-r] = p.Shape[r][c]
 		}
 	}
 	return rotated
@@ -52,7 +80,7 @@ func NewBoard() Board {
 }
 
 type Location struct {
-	X, Y int
+	C, R int
 }
 
 type PieceLocation struct {
@@ -65,9 +93,9 @@ func (b *Board) Clear() {
 }
 
 func (b *Board) CanPlacePiece(piece Piece) bool {
-	for i := range piece.Shape {
-		for j := range piece.Shape[i] {
-			loc := Location{X: i, Y: j}
+	for r := range piece.Shape {
+		for c := range piece.Shape[r] {
+			loc := Location{C: c, R: r}
 			if b.ValidatePiece(PieceLocation{Piece: piece, Loc: loc}, false) {
 				return true
 			}
@@ -86,16 +114,19 @@ func (b *Board) ValidatePiece(
 	}
 	loc := pieceLoc.Loc
 	piece := pieceLoc.Piece
-	for i := range piece.Shape {
-		for j := range piece.Shape[i] {
-			if piece.Shape[i][j] {
-				if loc.X+i >= BoardSize || loc.Y+j >= BoardSize {
-					return false
-				}
-				if allowPieceOverlap {
-					continue
-				}
-				if grid[loc.X+i][loc.Y+j] == Occupied {
+	if loc.C < 0 || loc.R < 0 {
+		return false
+	}
+	if loc.C+piece.Width() > BoardSize || loc.R+piece.Height() > BoardSize {
+		return false
+	}
+	if allowPieceOverlap {
+		return true
+	}
+	for r := range piece.Shape {
+		for c := range piece.Shape[r] {
+			if piece.Shape[r][c] {
+				if grid[loc.R+r][loc.C+c] == Occupied {
 					return false
 				}
 			}
@@ -124,17 +155,17 @@ func (b *Board) AddPiece(pieceLoc PieceLocation, pending bool) (Grid, bool) {
 	}
 
 	// Visualize the piece on the board
-	for i := range piece.Shape {
-		for j := range piece.Shape[i] {
-			if !piece.Shape[i][j] {
+	for r := range piece.Shape {
+		for c := range piece.Shape[r] {
+			if !piece.Shape[r][c] {
 				continue
 			}
-			if grid[loc.X+i][loc.Y+j] == Occupied {
-				grid[loc.X+i][loc.Y+j] = Invalid
+			if grid[loc.R+r][loc.C+c] == Occupied {
+				grid[loc.R+r][loc.C+c] = Invalid
 				anyInvalid = true
 				continue
 			}
-			grid[loc.X+i][loc.Y+j] = newPieceState
+			grid[loc.R+r][loc.C+c] = newPieceState
 		}
 	}
 	if anyInvalid {
@@ -142,10 +173,10 @@ func (b *Board) AddPiece(pieceLoc PieceLocation, pending bool) (Grid, bool) {
 	}
 
 	// Find full horizontal lines
-	for i := 0; i < BoardSize; i++ {
+	for r := range BoardSize {
 		full := true
-		for j := 0; j < BoardSize; j++ {
-			if grid[i][j] != Occupied && grid[i][j] != Pending {
+		for c := range BoardSize {
+			if grid[r][c] != Occupied && grid[r][c] != Pending {
 				full = false
 				break
 			}
@@ -153,17 +184,17 @@ func (b *Board) AddPiece(pieceLoc PieceLocation, pending bool) (Grid, bool) {
 		if !full {
 			continue
 		}
-		for j := 0; j < BoardSize; j++ {
-			if grid[i][j] != Pending {
-				grid[i][j] = newFullLineState
+		for c := range BoardSize {
+			if grid[r][c] != Pending {
+				grid[r][c] = newFullLineState
 			}
 		}
 	}
 	// Find full vertical lines
-	for j := 0; j < BoardSize; j++ {
+	for c := range BoardSize {
 		full := true
-		for i := 0; i < BoardSize; i++ {
-			if grid[i][j] != Occupied && grid[i][j] != Pending {
+		for r := range BoardSize {
+			if grid[r][c] != Occupied && grid[r][c] != Pending {
 				full = false
 				break
 			}
@@ -171,9 +202,9 @@ func (b *Board) AddPiece(pieceLoc PieceLocation, pending bool) (Grid, bool) {
 		if !full {
 			continue
 		}
-		for i := 0; i < BoardSize; i++ {
-			if grid[i][j] != Pending {
-				grid[i][j] = newFullLineState
+		for r := range BoardSize {
+			if grid[r][c] != Pending {
+				grid[r][c] = newFullLineState
 			}
 		}
 	}
@@ -197,22 +228,4 @@ func (b *Board) GetGrid() Grid {
 		panic("no grid history")
 	}
 	return grid
-}
-
-func (g Grid) String() string {
-	cellStateToIcon := map[CellState]string{
-		Empty:    "⬜",
-		Pending:  "🟩",
-		Invalid:  "🟥",
-		FullLine: "🟧",
-		Occupied: "🟦",
-	}
-	var sb strings.Builder
-	for _, row := range g {
-		for _, cell := range row {
-			_, _ = sb.WriteString(cellStateToIcon[cell])
-		}
-		sb.WriteString("\n")
-	}
-	return sb.String()
 }

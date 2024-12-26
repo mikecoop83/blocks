@@ -124,31 +124,28 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	if g.chosenPiece() != nil {
 		piece := *g.chosenPiece()
 		mouseX, mouseY := ebiten.CursorPosition()
-		pieceWidth := len(piece.Shape)
-		pieceHeight := len(piece.Shape[0])
-		adjustedX := mouseX - pieceWidth*cellSize/2
-		adjustedY := mouseY - pieceHeight*cellSize/2
-		cellX, cellY := adjustedX/cellSize, adjustedY/cellSize
+		cellC := mouseX / cellSize
+		cellR := mouseY / cellSize
+		// cellC = cellC - piece.Width()/2
+		// cellR = cellR - piece.Height()/2
 		// Clamp the piece to the board.
-		if cellX < 0 {
-			cellX = 0
+		if cellC < 0 {
+			cellC = 0
 		}
-		if cellY < 0 {
-			cellY = 0
+		if cellR < 0 {
+			cellR = 0
 		}
-		if cellX > lib.BoardSize-pieceWidth {
-			cellX = lib.BoardSize - pieceWidth
+		if cellC > lib.BoardSize-piece.Width() {
+			cellC = lib.BoardSize - piece.Width()
 		}
-		if cellY > lib.BoardSize-pieceHeight {
-			cellY = lib.BoardSize - pieceHeight
+		if cellR > lib.BoardSize-piece.Height() {
+			cellR = lib.BoardSize - piece.Height()
 		}
-
 		pending := !inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft)
-
 		pendingGrid, valid := g.board.AddPiece(
 			lib.PieceLocation{
 				Piece: piece,
-				Loc:   lib.Location{X: cellX, Y: cellY},
+				Loc:   lib.Location{C: cellC, R: cellR},
 			},
 			pending,
 		)
@@ -159,9 +156,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			g.pieceOptions[g.chosenPieceIdx] = nil
 		}
 	}
-	for c := range grid {
-		for r := range grid[c] {
-			state := grid[c][r]
+	for r := range grid {
+		for c := range grid[r] {
+			state := grid[r][c]
 			if state == lib.Empty {
 				continue
 			}
@@ -169,7 +166,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			vector.DrawFilledRect(
 				screen,
 				float32(c*cellSize), float32(r*cellSize),
-				float32(cellSize), float32(cellSize),
+				cellSize, cellSize,
 				cellColor,
 				false,
 			)
@@ -177,7 +174,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			vector.StrokeRect(
 				screen,
 				float32(c*cellSize), float32(r*cellSize),
-				float32(cellSize), float32(cellSize),
+				cellSize, cellSize,
 				1,
 				color.Black,
 				false,
@@ -195,10 +192,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		if p == g.chosenPieceIdx {
 			pieceOptionColor = cellStateToColor[lib.Pending]
 		}
-		pieceHeight := len(piece.Shape)
-		pieceWidth := len(piece.Shape[0])
-		yOffset := (bottomAreaHeight - pieceHeight*pieceOptionCellSize) / 2
-		xOffset := (pieceOptionWidth - pieceWidth*pieceOptionCellSize) / 2
+		yOffset := (bottomAreaHeight - piece.Height()*pieceOptionCellSize) / 2
+		xOffset := (pieceOptionWidth - piece.Width()*pieceOptionCellSize) / 2
 		for r := range piece.Shape {
 			for c := range piece.Shape[r] {
 				if !piece.Shape[r][c] {
