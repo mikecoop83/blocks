@@ -12,6 +12,8 @@ const (
 	Invalid
 	FullLine
 	Occupied
+	Unchosen
+	Hovering
 )
 
 const BoardSize = 8
