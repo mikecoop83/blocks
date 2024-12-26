@@ -20,7 +20,7 @@ import (
 // Game struct represents the game state.
 type Game struct {
 	board *lib.Board
-
+	
 	pieceOptions   [3]*lib.Piece
 	chosenPieceIdx int
 
@@ -177,7 +177,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			cellR = lib.BoardSize - piece.Height()
 		}
 		pending := !inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft)
-		pendingGrid, clearedLines, valid := g.board.AddPiece(
+		pendingGrid, clearedRows, clearedCols, valid := g.board.AddPiece(
 			lib.PieceLocation{
 				Piece: piece,
 				Loc:   lib.Location{C: cellC, R: cellR},
@@ -189,7 +189,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		}
 		if valid && !pending {
 			numPoints := g.chosenPiece().NumBlocks()
-			numPoints += clearedLines * 10
+			numClearedLines := len(clearedRows) + len(clearedCols)
+			numPoints += numClearedLines * 10
 			g.score += int64(numPoints)
 			g.pieceOptions[g.chosenPieceIdx] = nil
 		}

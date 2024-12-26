@@ -147,9 +147,12 @@ func (b *Board) ValidatePiece(
 	return true
 }
 
-func (b *Board) AddPiece(pieceLoc PieceLocation, pending bool) (Grid, int, bool) {
+func (b *Board) AddPiece(
+	pieceLoc PieceLocation,
+	pending bool,
+) (Grid, []int, []int, bool) {
 	if !b.ValidatePiece(pieceLoc, pending) {
-		return b.GetGrid(), 0, false
+		return b.GetGrid(), nil, nil, false
 	}
 	grid, ok := b.gridHistory.Peek()
 	if !ok {
@@ -181,11 +184,12 @@ func (b *Board) AddPiece(pieceLoc PieceLocation, pending bool) (Grid, int, bool)
 		}
 	}
 	if anyInvalid {
-		return grid, 0, false
+		return grid, nil, nil, false
 	}
 
-	var clearedLines int
-	// Find full horizontal lines
+	clearedRows := make([]int, 0)
+	clearedCols := make([]int, 0)
+	// Find cleared rows
 	for r := range BoardSize {
 		full := true
 		for c := range BoardSize {
@@ -197,14 +201,14 @@ func (b *Board) AddPiece(pieceLoc PieceLocation, pending bool) (Grid, int, bool)
 		if !full {
 			continue
 		}
-		clearedLines++
+		clearedRows = append(clearedRows, r)
 		for c := range BoardSize {
 			if grid[r][c] != Pending {
 				grid[r][c] = newFullLineState
 			}
 		}
 	}
-	// Find full vertical lines
+	// Find cleared columns
 	for c := range BoardSize {
 		full := true
 		for r := range BoardSize {
@@ -216,7 +220,7 @@ func (b *Board) AddPiece(pieceLoc PieceLocation, pending bool) (Grid, int, bool)
 		if !full {
 			continue
 		}
-		clearedLines++
+		clearedCols = append(clearedCols, c)
 		for r := range BoardSize {
 			if grid[r][c] != Pending {
 				grid[r][c] = newFullLineState
@@ -226,7 +230,7 @@ func (b *Board) AddPiece(pieceLoc PieceLocation, pending bool) (Grid, int, bool)
 	if !pending {
 		b.gridHistory.Push(grid)
 	}
-	return grid, clearedLines, true
+	return grid, clearedRows, clearedCols, true
 }
 
 func (b *Board) Undo() bool {
