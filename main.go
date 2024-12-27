@@ -2,7 +2,6 @@ package main
 
 import (
 	"image/color"
-	"log"
 	"math/rand"
 	"time"
 
@@ -53,16 +52,16 @@ var commaFormatter = message.NewPrinter(language.English)
 type Game struct {
 	board *lib.Board
 
-	pieceOptions   [numPieceOptions]*lib.Piece
-	chosenPieceIdx int
+	pieceOptions [numPieceOptions]*lib.Piece
 
 	clearedRows [lib.BoardSize]*animatedEntity
 	clearedCols [lib.BoardSize]*animatedEntity
 
-	mouseX       int
-	mouseY       int
-	clicked      bool
-	touchEnabled bool
+	touchEnabled       bool
+	pressX, pressY     int
+	dragX, dragY       int
+	releaseX, releaseY int
+	chosenPieceIdx     int
 
 	score    int64
 	gameOver bool
@@ -70,14 +69,23 @@ type Game struct {
 
 func (g *Game) Reset() {
 	g.pieceOptions = [numPieceOptions]*lib.Piece{}
-	g.chosenPieceIdx = 0
+	g.chosenPieceIdx = -1
 	g.score = 0
 	g.gameOver = false
 	newBoard := lib.NewBoard()
 	g.board = &newBoard
 }
 
+func newGame() *Game {
+	game := &Game{}
+	game.Reset()
+	return game
+}
+
 func (g *Game) chosenPiece() *lib.Piece {
+	if g.chosenPieceIdx < 0 || g.chosenPieceIdx >= len(g.pieceOptions) {
+		return nil
+	}
 	return g.pieceOptions[g.chosenPieceIdx]
 }
 
@@ -93,26 +101,37 @@ func getRandomRotatedPiece() *lib.Piece {
 
 // Update is called every tick (1/60 seconds by default) to tick the game state.
 func (g *Game) Update() error {
-	var pressedTouchIDs, touchIDs, releasedTouchIDs []ebiten.TouchID
+	var pressedTouchIDs, dragTouchIDs, releasedTouchIDs []ebiten.TouchID
 	pressedTouchIDs = inpututil.AppendJustPressedTouchIDs(pressedTouchIDs)
-	touchIDs = ebiten.AppendTouchIDs(touchIDs)
-	if len(pressedTouchIDs) > 0 || len(touchIDs) > 0 || len(releasedTouchIDs) > 0 {
+	dragTouchIDs = ebiten.AppendTouchIDs(dragTouchIDs)
+	releasedTouchIDs = inpututil.AppendJustReleasedTouchIDs(releasedTouchIDs)
+	if len(pressedTouchIDs) > 0 || len(dragTouchIDs) > 0 || len(releasedTouchIDs) > 0 {
 		g.touchEnabled = true
 	}
 	if g.touchEnabled {
 		for _, id := range pressedTouchIDs {
-			g.mouseX, g.mouseY = ebiten.TouchPosition(id)
+			g.pressX, g.pressY = ebiten.TouchPosition(id)
 		}
-		for _, id := range touchIDs {
-			g.mouseX, g.mouseY = ebiten.TouchPosition(id)
+		for _, id := range dragTouchIDs {
+			g.dragX, g.dragY = ebiten.TouchPosition(id)
 		}
-		releasedTouchIDs = inpututil.AppendJustReleasedTouchIDs(releasedTouchIDs)
 		if len(releasedTouchIDs) > 0 {
-			g.clicked = true
+			g.releaseX, g.releaseY = g.dragX, g.dragY
+			g.dragX, g.dragY = -1, -1
+			g.pressX, g.pressY = -1, -1
 		}
 	} else {
-		g.mouseX, g.mouseY = ebiten.CursorPosition()
-		g.clicked = inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft)
+		if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+			g.pressX, g.pressY = ebiten.CursorPosition()
+		}
+		if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
+			g.dragX, g.dragY = ebiten.CursorPosition()
+		}
+		if inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft) {
+			g.releaseX, g.releaseY = ebiten.CursorPosition()
+			g.dragX, g.dragY = -1, -1
+			g.pressX, g.pressY = -1, -1
+		}
 	}
 	if inpututil.IsKeyJustReleased(ebiten.KeyQ) {
 		return ebiten.Termination
@@ -121,21 +140,11 @@ func (g *Game) Update() error {
 		g.Reset()
 	}
 
-	// If the chosen piece is nil, choose the first available piece.
-	if g.chosenPiece() == nil {
-		for i := 0; i < len(g.pieceOptions); i++ {
-			if g.pieceOptions[i] != nil {
-				g.chosenPieceIdx = i
-				break
-			}
-		}
-	}
-	// If none left, get numPieceOptions new pieces and set first piece to be chosen.
-	if g.chosenPiece() == nil {
+	// If no pieces to choose, get numPieceOptions new pieces and set first piece to be chosen.
+	if g.pieceOptions[0] == nil && g.pieceOptions[1] == nil && g.pieceOptions[2] == nil {
 		for i := 0; i < numPieceOptions; i++ {
 			g.pieceOptions[i] = getRandomRotatedPiece()
 		}
-		g.chosenPieceIdx = 0
 	}
 	// Check if the game is over.
 	var hasValidMove bool
@@ -178,11 +187,10 @@ outer:
 // Draw is called every frame to render the screen.
 func (g *Game) Draw(screen *ebiten.Image) {
 	defer func() {
-		if g.clicked {
-			g.mouseX = -1
-			g.mouseY = -1
+		if g.releaseX >= 0 && g.releaseY >= 0 {
+			g.chosenPieceIdx = -1
 		}
-		g.clicked = false
+		g.releaseX, g.releaseY = -1, -1
 	}()
 	// Draw the background.
 	vector.DrawFilledRect(
@@ -246,7 +254,6 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		)
 	}
 
-	mouseOnBoard := g.mouseX >= 0 && g.mouseX < boardWidth && g.mouseY >= boardYOffset && g.mouseY < boardYOffset+boardHeight
 	// Draw gridlines
 	var gridColor = color.Gray16{Y: 0xBBBB}
 	for i := 0; i <= lib.BoardSize; i++ {
@@ -271,10 +278,21 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	grid := g.board.GetGrid()
-	if mouseOnBoard && g.chosenPiece() != nil {
+
+	// Either drag or click is the current mouse position.
+	mouseX, mouseY := g.dragX, g.dragY
+	if mouseX < 0 {
+		mouseX, mouseY = g.releaseX, g.releaseY
+	}
+	onBoard := mouseX >= 0 &&
+		mouseX < boardWidth &&
+		mouseY >= boardYOffset &&
+		mouseY < boardYOffset+boardHeight
+
+	if onBoard && g.chosenPiece() != nil {
 		piece := *g.chosenPiece()
-		cellC := g.mouseX / cellSize
-		cellR := (g.mouseY - boardYOffset) / cellSize
+		cellC := mouseX / cellSize
+		cellR := (mouseY - boardYOffset) / cellSize
 
 		// Clamp the piece to the board if the mouse is on the board
 		if cellC < 0 {
@@ -290,7 +308,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			cellR = lib.BoardSize - piece.Height()
 		}
 		pending := true
-		if g.clicked {
+		if g.releaseX >= 0 && g.releaseY >= 0 {
 			pending = false
 		}
 		pendingGrid, clearedRows, clearedCols, valid := g.board.AddPiece(
@@ -360,7 +378,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			continue
 		}
 		pieceOptionColor := cellStateToColor[lib.Unchosen]
-		if p == g.chosenPieceIdx {
+		if p == g.chosenPieceIdx && g.releaseX >= 0 && g.releaseY >= 0 {
 			pieceOptionColor = cellStateToColor[lib.Pending]
 		}
 		yOffset := (bottomAreaHeight - piece.Height()*pieceOptionCellSize) / 2
@@ -368,13 +386,10 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		// If the mouse is hovering over an unselected piece, change the color.  Select it if it was just clicked.
 		pieceX := xOffset + p*pieceOptionWidth
 		pieceY := bottomAreaOffset + yOffset
-		if g.chosenPieceIdx != p &&
-			g.mouseX >= pieceX && g.mouseX < pieceX+piece.Width()*pieceOptionCellSize &&
-			g.mouseY >= pieceY && g.mouseY < pieceY+piece.Height()*pieceOptionCellSize {
+		if g.pressX >= pieceX && g.pressX < pieceX+piece.Width()*pieceOptionCellSize &&
+			g.pressY >= pieceY && g.pressY < pieceY+piece.Height()*pieceOptionCellSize {
 			pieceOptionColor = cellStateToColor[lib.Hovering]
-			if inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft) {
-				g.chosenPieceIdx = p
-			}
+			g.chosenPieceIdx = p
 		}
 		for r := range piece.Shape {
 			for c := range piece.Shape[r] {
@@ -413,10 +428,7 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 
 func main() {
 	// Initialize the game object.
-	board := lib.NewBoard()
-	game := &Game{
-		board: &board,
-	}
+	game := newGame()
 
 	// Set the window title.
 	ebiten.SetWindowTitle("Blocks")
@@ -425,6 +437,6 @@ func main() {
 
 	// Run the game.
 	if err := ebiten.RunGame(game); err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 }
