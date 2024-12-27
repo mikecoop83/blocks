@@ -59,9 +59,10 @@ type Game struct {
 	clearedRows [lib.BoardSize]*animatedEntity
 	clearedCols [lib.BoardSize]*animatedEntity
 
-	mouseX  int
-	mouseY  int
-	clicked bool
+	mouseX       int
+	mouseY       int
+	clicked      bool
+	touchEnabled bool
 
 	score    int64
 	gameOver bool
@@ -92,19 +93,27 @@ func getRandomRotatedPiece() *lib.Piece {
 
 // Update is called every tick (1/60 seconds by default) to tick the game state.
 func (g *Game) Update() error {
-	mouseX, mouseY := ebiten.CursorPosition()
-	touchIDs := inpututil.AppendJustPressedTouchIDs(nil)
-	for _, id := range touchIDs {
-		mouseX, mouseY = ebiten.TouchPosition(id)
-		if inpututil.IsTouchJustReleased(id) {
+	var pressedTouchIDs, touchIDs, releasedTouchIDs []ebiten.TouchID
+	pressedTouchIDs = inpututil.AppendJustPressedTouchIDs(pressedTouchIDs)
+	touchIDs = ebiten.AppendTouchIDs(touchIDs)
+	if len(pressedTouchIDs) > 0 || len(touchIDs) > 0 || len(releasedTouchIDs) > 0 {
+		g.touchEnabled = true
+	}
+	if g.touchEnabled {
+		for _, id := range pressedTouchIDs {
+			g.mouseX, g.mouseY = ebiten.TouchPosition(id)
+		}
+		for _, id := range touchIDs {
+			g.mouseX, g.mouseY = ebiten.TouchPosition(id)
+		}
+		releasedTouchIDs = inpututil.AppendJustReleasedTouchIDs(releasedTouchIDs)
+		if len(releasedTouchIDs) > 0 {
 			g.clicked = true
 		}
+	} else {
+		g.mouseX, g.mouseY = ebiten.CursorPosition()
+		g.clicked = inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft)
 	}
-	if inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft) {
-		g.clicked = true
-	}
-	g.mouseX, g.mouseY = mouseX, mouseY
-
 	if inpututil.IsKeyJustReleased(ebiten.KeyQ) {
 		return ebiten.Termination
 	}
@@ -168,6 +177,13 @@ outer:
 
 // Draw is called every frame to render the screen.
 func (g *Game) Draw(screen *ebiten.Image) {
+	defer func() {
+		if g.clicked {
+			g.mouseX = -1
+			g.mouseY = -1
+		}
+		g.clicked = false
+	}()
 	// Draw the background.
 	vector.DrawFilledRect(
 		screen,
@@ -178,13 +194,10 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		false,
 	)
 	const topAreaOffset = 0
-	// Draw the top area with the score.
-	msg := commaFormatter.Sprintf("Score: %d, Mouse: %d, %d", g.score, g.mouseX, g.mouseY)
-
+	msg := commaFormatter.Sprintf("Score: %d", g.score)
 	if g.gameOver {
 		msg = "Game Over! " + msg
 	}
-
 	bounds, _ := font.BoundString(resources.FontFace, msg)
 
 	// Calculate text width and height
@@ -279,7 +292,6 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		pending := true
 		if g.clicked {
 			pending = false
-			g.clicked = false
 		}
 		pendingGrid, clearedRows, clearedCols, valid := g.board.AddPiece(
 			lib.PieceLocation{
