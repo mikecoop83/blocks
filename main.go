@@ -18,13 +18,14 @@ import (
 )
 
 var (
-	white      = color.RGBA{R: 0xf0, G: 0xf0, B: 0xf0, A: 0xff}
-	green      = color.RGBA{R: 0x00, G: 0xcc, B: 0x66, A: 0xff}
-	red        = color.RGBA{R: 0xff, G: 0x66, B: 0x66, A: 0xff}
-	blue       = color.RGBA{R: 0x66, G: 0x99, B: 0xff, A: 0xff}
-	orange     = color.RGBA{R: 0xff, G: 0xa5, B: 0x00, A: 0xff}
-	gray       = color.RGBA{R: 0x80, G: 0x80, B: 0x80, A: 0xff}
-	paleYellow = color.RGBA{R: 0xff, G: 0xff, B: 0xcc, A: 0xff}
+	white       = color.RGBA{R: 0xf0, G: 0xf0, B: 0xf0, A: 0xff}
+	green       = color.RGBA{R: 0x00, G: 0xcc, B: 0x66, A: 0xff}
+	red         = color.RGBA{R: 0xff, G: 0x66, B: 0x66, A: 0xff}
+	blue        = color.RGBA{R: 0x66, G: 0x99, B: 0xff, A: 0xff}
+	orange      = color.RGBA{R: 0xff, G: 0xa5, B: 0x00, A: 0xff}
+	gray        = color.RGBA{R: 0x80, G: 0x80, B: 0x80, A: 0xff}
+	paleYellow  = color.RGBA{R: 0xff, G: 0xff, B: 0xcc, A: 0xff}
+	reddishGray = color.RGBA{R: 0x99, G: 0x66, B: 0x66, A: 0xff}
 )
 
 const (
@@ -38,6 +39,16 @@ const (
 
 var cellStateToColor = map[lib.CellState]color.Color{
 	lib.Empty:    white,
+	lib.Pending:  green,
+	lib.Invalid:  red,
+	lib.FullLine: orange,
+	lib.Occupied: blue,
+	lib.Unchosen: gray,
+	lib.Hovering: paleYellow,
+}
+
+var cheatingCellStateToColor = map[lib.CellState]color.Color{
+	lib.Empty:    reddishGray,
 	lib.Pending:  green,
 	lib.Invalid:  red,
 	lib.FullLine: orange,
@@ -207,10 +218,6 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}()
 	// Draw the background.
 	background := white
-	if g.cheating {
-		// reddish gray
-		background = color.RGBA{R: 0x99, G: 0x66, B: 0x66, A: 0xff}
-	}
 	vector.DrawFilledRect(
 		screen,
 		0, 0,
@@ -366,13 +373,14 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			}
 		}
 	}
+	// Draw the cells
 	for r := range grid {
 		for c := range grid[r] {
 			state := grid[r][c]
-			if state == lib.Empty {
-				continue
-			}
 			cellColor := cellStateToColor[state]
+			if g.cheating {
+				cellColor = cheatingCellStateToColor[state]
+			}
 			vector.DrawFilledRect(
 				screen,
 				float32(c*cellSize), float32(boardYOffset+r*cellSize),
