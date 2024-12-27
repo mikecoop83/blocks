@@ -93,13 +93,11 @@ func getRandomRotatedPiece() *lib.Piece {
 // Update is called every tick (1/60 seconds by default) to tick the game state.
 func (g *Game) Update() error {
 	mouseX, mouseY := ebiten.CursorPosition()
-	if mouseX == 0 && mouseY == 0 {
-		touchIDs := inpututil.AppendJustPressedTouchIDs(nil)
-		for _, id := range touchIDs {
-			mouseX, mouseY = ebiten.TouchPosition(id)
-			if inpututil.IsTouchJustReleased(id) {
-				g.clicked = true
-			}
+	touchIDs := inpututil.AppendJustPressedTouchIDs(nil)
+	for _, id := range touchIDs {
+		mouseX, mouseY = ebiten.TouchPosition(id)
+		if inpututil.IsTouchJustReleased(id) {
+			g.clicked = true
 		}
 	}
 	if inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft) {
