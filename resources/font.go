@@ -8,18 +8,17 @@ import (
 	"golang.org/x/image/font/sfnt"
 )
 
-//go:embed Roboto-Regular.ttf
-var robotoFontData []byte
-
-var FontFace font.Face
+//go:embed text.ttf
+var textFontData []byte
+var TextFontFace font.Face
 
 func init() {
 	var err error
-	ttf, err := sfnt.Parse(robotoFontData)
+	ttf, err := sfnt.Parse(textFontData)
 	if err != nil {
 		panic(err)
 	}
-	FontFace, err = opentype.NewFace(
+	TextFontFace, err = opentype.NewFace(
 		ttf, &opentype.FaceOptions{
 			Size: 50,
 			DPI:  72,

@@ -16,6 +16,10 @@ var RestartImage *ebiten.Image
 var logoImageData []byte
 var LogoImage *ebiten.Image
 
+//go:embed 1stplace.png
+var firstPlaceImageData []byte
+var FirstPlaceImage *ebiten.Image
+
 func init() {
 	restartImageReader := bytes.NewReader(restartImageData)
 	var err error
@@ -25,6 +29,11 @@ func init() {
 	}
 	logoImageReader := bytes.NewReader(logoImageData)
 	LogoImage, _, err = ebitenutil.NewImageFromReader(logoImageReader)
+	if err != nil {
+		panic(err)
+	}
+	firstPlaceImageReader := bytes.NewReader(firstPlaceImageData)
+	FirstPlaceImage, _, err = ebitenutil.NewImageFromReader(firstPlaceImageReader)
 	if err != nil {
 		panic(err)
 	}

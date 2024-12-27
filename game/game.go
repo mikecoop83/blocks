@@ -3,9 +3,12 @@ package game
 import (
 	"image/color"
 	"math/rand"
+	"strconv"
 	"time"
 
+	"github.com/mikecoop83/blocks/persist"
 	"golang.org/x/image/font"
+	"golang.org/x/image/math/fixed"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 
@@ -76,9 +79,25 @@ type Game struct {
 	releaseX, releaseY int
 	chosenPieceIdx     int
 
-	score    int64
-	gameOver bool
-	cheating bool
+	score     int64
+	highScore int64
+	gameOver  bool
+	cheating  bool
+	cheated   bool
+}
+
+func maybeGetHighScore() int64 {
+	highScoreStr, err := persist.Load("highscore")
+	if err != nil {
+		log("failed to load high score: %v", err)
+		return 0
+	}
+	highScore, err := strconv.ParseInt(highScoreStr, 10, 64)
+	if err != nil {
+		log("failed to parse high score: %v", err)
+		return 0
+	}
+	return highScore
 }
 
 func (g *Game) Reset() {
@@ -88,6 +107,8 @@ func (g *Game) Reset() {
 	g.gameOver = false
 	newBoard := lib.NewBoard()
 	g.board = &newBoard
+	g.highScore = maybeGetHighScore()
+	g.cheated = false
 }
 
 func New() ebiten.Game {
@@ -118,6 +139,13 @@ func getRandomRotatedPiece() *lib.Piece {
 
 // Update is called every tick (1/60 seconds by default) to tick the game state.
 func (g *Game) Update() error {
+	if !g.cheated && g.score > g.highScore {
+		g.highScore = g.score
+		err := persist.Store("highscore", strconv.FormatInt(g.highScore, 10))
+		if err != nil {
+			log("failed to save high score: %v", err)
+		}
+	}
 	g.cheating = ebiten.IsKeyPressed(ebiten.KeyMeta) && ebiten.IsKeyPressed(ebiten.KeyShift)
 	var pressedTouchIDs, dragTouchIDs, releasedTouchIDs []ebiten.TouchID
 	pressedTouchIDs = inpututil.AppendJustPressedTouchIDs(pressedTouchIDs)
@@ -225,28 +253,43 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		background,
 		false,
 	)
-	const topAreaOffset = 0
-	msg := commaFormatter.Sprintf("Score: %d", g.score)
-	if g.gameOver {
-		msg = "Game Over! " + msg
+
+	// High score at top left
+	op := &ebiten.DrawImageOptions{}
+	const firstPlaceHeight = topAreaHeight * 0.75
+	const firstPlaceWidth = topAreaHeight * 0.75
+	scaleX := firstPlaceWidth / float64(resources.FirstPlaceImage.Bounds().Dx())
+	scaleY := firstPlaceHeight / float64(resources.FirstPlaceImage.Bounds().Dy())
+	op.GeoM.Scale(scaleX, scaleY)
+	op.GeoM.Translate(0, (topAreaHeight-firstPlaceHeight)/2)
+
+	screen.DrawImage(resources.FirstPlaceImage, op)
+
+	highScoreMsg := commaFormatter.Sprintf("%d", g.highScore)
+	_, highScoreHeight := getTextSize(highScoreMsg, resources.TextFontFace)
+	var highScoreColor color.Color = color.Black
+	if g.cheated {
+		highScoreColor = reddishGray
 	}
-	bounds, _ := font.BoundString(resources.FontFace, msg)
-
-	// Calculate text width and height
-	textWidth := (bounds.Max.X - bounds.Min.X) >> 6
-	textHeight := (bounds.Max.Y - bounds.Min.Y) >> 6
-
-	// Calculate the center position
-	textX := (boardWidth - textWidth) / 2
-	textY := (topAreaHeight - textHeight) / 2
-
-	// Adjust for baseline alignment
-	textY += textHeight
 	text.Draw(
 		screen,
-		msg,
-		resources.FontFace,
-		int(textX), int(topAreaOffset+textY),
+		highScoreMsg,
+		resources.TextFontFace,
+		// Text offset is at a weird spot towards the bottom of the letters, so we need to offset it by the height of the
+		// text to center it.
+		firstPlaceWidth, int(((topAreaHeight-highScoreHeight)/2)+highScoreHeight),
+		highScoreColor,
+	)
+
+	// Score at top right
+	scoreMsg := commaFormatter.Sprintf("%d", g.score)
+	scoreWidth, scoreHeight := getTextSize(scoreMsg, resources.TextFontFace)
+	text.Draw(
+		screen,
+		scoreMsg,
+		resources.TextFontFace,
+		// Offset it from the right edge a bit
+		int(boardWidth-scoreWidth-20), int(((topAreaHeight-scoreHeight)/2)+scoreHeight),
 		color.Black,
 	)
 
@@ -346,6 +389,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			g.score += int64(numPoints)
 			if !g.cheating {
 				g.pieceOptions[g.chosenPieceIdx] = nil
+			} else {
+				g.cheated = true
 			}
 		}
 	}
@@ -458,6 +503,15 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			}
 		}
 	}
+}
+
+func getTextSize(scoreMsg string, face font.Face) (fixed.Int26_6, fixed.Int26_6) {
+	bounds, _ := font.BoundString(face, scoreMsg)
+
+	// Calculate text width and height
+	textWidth := (bounds.Max.X - bounds.Min.X) >> 6
+	textHeight := (bounds.Max.Y - bounds.Min.Y) >> 6
+	return textWidth, textHeight
 }
 
 // Layout returns the logical screen dimensions. The game window will scale to fit this size.
