@@ -375,7 +375,13 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 	// Draw the cells
 	for r := range grid {
+		if g.clearedRows[r] != nil {
+			continue
+		}
 		for c := range grid[r] {
+			if g.clearedCols[c] != nil {
+				continue
+			}
 			state := grid[r][c]
 			cellColor := cellStateToColor[state]
 			if g.cheating {
