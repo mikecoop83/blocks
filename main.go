@@ -157,9 +157,6 @@ func (g *Game) Update() error {
 			g.pressX, g.pressY = -1, -1
 		}
 	}
-	if inpututil.IsKeyJustReleased(ebiten.KeyQ) {
-		return ebiten.Termination
-	}
 	if inpututil.IsKeyJustReleased(ebiten.KeyR) {
 		g.Reset()
 	}
@@ -476,7 +473,8 @@ func main() {
 	ebiten.SetWindowSize(boardWidth, boardHeight+bottomAreaHeight)
 
 	// Run the game.
-	if err := ebiten.RunGame(game); err != nil {
+	err := ebiten.RunGame(game)
+	if err != nil {
 		panic(err)
 	}
 }
