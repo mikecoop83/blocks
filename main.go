@@ -59,8 +59,9 @@ type Game struct {
 	clearedRows [lib.BoardSize]*animatedEntity
 	clearedCols [lib.BoardSize]*animatedEntity
 
-	mouseX int
-	mouseY int
+	mouseX  int
+	mouseY  int
+	clicked bool
 
 	score    int64
 	gameOver bool
@@ -91,7 +92,21 @@ func getRandomRotatedPiece() *lib.Piece {
 
 // Update is called every tick (1/60 seconds by default) to tick the game state.
 func (g *Game) Update() error {
-	g.mouseX, g.mouseY = ebiten.CursorPosition()
+	mouseX, mouseY := ebiten.CursorPosition()
+	if mouseX == 0 && mouseY == 0 {
+		touchIDs := inpututil.AppendJustPressedTouchIDs(nil)
+		for _, id := range touchIDs {
+			mouseX, mouseY = ebiten.TouchPosition(id)
+			if inpututil.IsTouchJustReleased(id) {
+				g.clicked = true
+			}
+		}
+	}
+	if inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft) {
+		g.clicked = true
+	}
+	g.mouseX, g.mouseY = mouseX, mouseY
+
 	if inpututil.IsKeyJustReleased(ebiten.KeyQ) {
 		return ebiten.Termination
 	}
@@ -166,7 +181,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	)
 	const topAreaOffset = 0
 	// Draw the top area with the score.
-	msg := commaFormatter.Sprintf("Score: %d", g.score)
+	msg := commaFormatter.Sprintf("Score: %d, Mouse: %d, %d", g.score, g.mouseX, g.mouseY)
 
 	if g.gameOver {
 		msg = "Game Over! " + msg
@@ -263,7 +278,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		if cellR > lib.BoardSize-piece.Height() {
 			cellR = lib.BoardSize - piece.Height()
 		}
-		pending := !inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft)
+		pending := true
+		if g.clicked {
+			pending = false
+			g.clicked = false
+		}
 		pendingGrid, clearedRows, clearedCols, valid := g.board.AddPiece(
 			lib.PieceLocation{
 				Piece: piece,
