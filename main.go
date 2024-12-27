@@ -394,8 +394,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		// If the mouse is hovering over an unselected piece, change the color.  Select it if it was just clicked.
 		pieceX := xOffset + p*pieceOptionWidth
 		pieceY := bottomAreaOffset + yOffset
-		if g.pressX >= pieceX && g.pressX < pieceX+piece.Width()*pieceOptionCellSize &&
-			g.pressY >= pieceY && g.pressY < pieceY+piece.Height()*pieceOptionCellSize {
+		// Break the bottom area into large sections so we don't require touching the piece itself to drag it on to the
+		// board
+		pieceAreaX := p * pieceOptionWidth
+		pieceAreaY := bottomAreaOffset
+		if g.pressX >= pieceAreaX && g.pressX < pieceAreaX+pieceOptionWidth &&
+			g.pressY >= pieceAreaY && g.pressY < pieceAreaY+bottomAreaHeight {
 			pieceOptionColor = cellStateToColor[lib.Hovering]
 			g.chosenPieceIdx = p
 		}
