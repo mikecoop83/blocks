@@ -195,7 +195,7 @@ outer:
 	}
 
 	// Update the animations for cleared rows and columns.
-	for _, rowsAndColumns := range [2][lib.BoardSize]*animatedEntity{g.clearedRows, g.clearedCols} {
+	for _, rowsAndColumns := range [2]*[lib.BoardSize]*animatedEntity{&g.clearedRows, &g.clearedCols} {
 		for i, entity := range rowsAndColumns {
 			if entity == nil {
 				continue
@@ -279,29 +279,6 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		)
 	}
 
-	// Draw gridlines
-	var gridColor = color.Gray16{Y: 0xBBBB}
-	for i := 0; i <= lib.BoardSize; i++ {
-		// Horizontal line
-		vector.StrokeLine(
-			screen,
-			float32(i*cellSize), float32(boardYOffset),
-			float32(i*cellSize), float32(boardYOffset+boardHeight),
-			1,
-			gridColor,
-			false,
-		)
-		// Vertical line
-		vector.StrokeLine(
-			screen,
-			0, float32(boardYOffset+i*cellSize),
-			boardWidth, float32(boardYOffset+i*cellSize),
-			1,
-			gridColor,
-			false,
-		)
-	}
-
 	grid := g.board.GetGrid()
 
 	// Either drag or click is the current mouse position.
@@ -357,14 +334,14 @@ func (g *Game) Draw(screen *ebiten.Image) {
 				g.clearedRows[r] = &animatedEntity{
 					currentColor:  cellStateToColor[lib.FullLine],
 					targetColor:   cellStateToColor[lib.Empty],
-					animationTime: 3 * time.Second,
+					animationTime: 1 * time.Second,
 				}
 			}
 			for _, c := range clearedCols {
 				g.clearedCols[c] = &animatedEntity{
 					currentColor:  cellStateToColor[lib.FullLine],
 					targetColor:   cellStateToColor[lib.Empty],
-					animationTime: 3 * time.Second,
+					animationTime: 1 * time.Second,
 				}
 			}
 			g.score += int64(numPoints)
@@ -404,6 +381,28 @@ func (g *Game) Draw(screen *ebiten.Image) {
 				false,
 			)
 		}
+	}
+
+	// Draw gridlines
+	for i := 0; i <= lib.BoardSize; i++ {
+		// Horizontal line
+		vector.StrokeLine(
+			screen,
+			float32(i*cellSize), float32(boardYOffset),
+			float32(i*cellSize), float32(boardYOffset+boardHeight),
+			1,
+			color.Black,
+			false,
+		)
+		// Vertical line
+		vector.StrokeLine(
+			screen,
+			0, float32(boardYOffset+i*cellSize),
+			boardWidth, float32(boardYOffset+i*cellSize),
+			1,
+			color.Black,
+			false,
+		)
 	}
 
 	// Draw the bottom area with the piece options
