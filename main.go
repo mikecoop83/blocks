@@ -1,10 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"image/color"
 	"math/rand"
-	"syscall/js"
 	"time"
 
 	"golang.org/x/image/font"
@@ -99,10 +97,6 @@ func getRandomRotatedPiece() *lib.Piece {
 		piece = piece.Rotate()
 	}
 	return &piece
-}
-
-func log(msg string, args ...interface{}) {
-	js.Global().Get("console").Call("log", fmt.Sprintf(msg, args...))
 }
 
 // Update is called every tick (1/60 seconds by default) to tick the game state.
