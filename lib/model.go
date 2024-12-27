@@ -20,6 +20,17 @@ const BoardSize = 8
 
 type Grid [BoardSize][BoardSize]CellState
 
+func (g Grid) Empty() bool {
+	for r := range g {
+		for c := range g[r] {
+			if g[r][c] != Empty {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func (g Grid) String() string {
 	cellStateToIcon := map[CellState]string{
 		Empty:    "e",
@@ -189,6 +200,7 @@ func (b *Board) AddPiece(
 
 	clearedRows := make([]int, 0)
 	clearedCols := make([]int, 0)
+	cellsToUpdate := make([]Location, 0)
 	// Find cleared rows
 	for r := range BoardSize {
 		full := true
@@ -204,7 +216,7 @@ func (b *Board) AddPiece(
 		clearedRows = append(clearedRows, r)
 		for c := range BoardSize {
 			if grid[r][c] != Pending {
-				grid[r][c] = newFullLineState
+				cellsToUpdate = append(cellsToUpdate, Location{C: c, R: r})
 			}
 		}
 	}
@@ -223,9 +235,13 @@ func (b *Board) AddPiece(
 		clearedCols = append(clearedCols, c)
 		for r := range BoardSize {
 			if grid[r][c] != Pending {
-				grid[r][c] = newFullLineState
+				cellsToUpdate = append(cellsToUpdate, Location{C: c, R: r})
 			}
 		}
+	}
+	// Clear full lines
+	for _, cellLoc := range cellsToUpdate {
+		grid[cellLoc.R][cellLoc.C] = newFullLineState
 	}
 	if !pending {
 		b.gridHistory.Push(grid)

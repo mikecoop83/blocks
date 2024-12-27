@@ -65,6 +65,7 @@ type Game struct {
 
 	score    int64
 	gameOver bool
+	cheating bool
 }
 
 func (g *Game) Reset() {
@@ -83,6 +84,9 @@ func newGame() *Game {
 }
 
 func (g *Game) chosenPiece() *lib.Piece {
+	if g.cheating {
+		return &lib.AllPieces[0]
+	}
 	if g.chosenPieceIdx < 0 || g.chosenPieceIdx >= len(g.pieceOptions) {
 		return nil
 	}
@@ -101,6 +105,7 @@ func getRandomRotatedPiece() *lib.Piece {
 
 // Update is called every tick (1/60 seconds by default) to tick the game state.
 func (g *Game) Update() error {
+	g.cheating = ebiten.IsKeyPressed(ebiten.KeyMeta) && ebiten.IsKeyPressed(ebiten.KeyShift)
 	var pressedTouchIDs, dragTouchIDs, releasedTouchIDs []ebiten.TouchID
 	pressedTouchIDs = inpututil.AppendJustPressedTouchIDs(pressedTouchIDs)
 	dragTouchIDs = ebiten.AppendTouchIDs(dragTouchIDs)
@@ -201,12 +206,17 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		g.releaseX, g.releaseY = -1, -1
 	}()
 	// Draw the background.
+	background := white
+	if g.cheating {
+		// reddish gray
+		background = color.RGBA{R: 0x99, G: 0x66, B: 0x66, A: 0xff}
+	}
 	vector.DrawFilledRect(
 		screen,
 		0, 0,
 		float32(screen.Bounds().Max.X),
 		float32(screen.Bounds().Max.Y),
-		white,
+		background,
 		false,
 	)
 	const topAreaOffset = 0
@@ -333,6 +343,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			numPoints := g.chosenPiece().NumBlocks()
 			numClearedLines := len(clearedRows) + len(clearedCols)
 			numPoints += numClearedLines * 10
+			if grid.Empty() {
+				numPoints += 300
+			}
 			for _, r := range clearedRows {
 				g.clearedRows[r] = &animatedEntity{
 					currentColor:  cellStateToColor[lib.FullLine],
@@ -348,7 +361,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 				}
 			}
 			g.score += int64(numPoints)
-			g.pieceOptions[g.chosenPieceIdx] = nil
+			if !g.cheating {
+				g.pieceOptions[g.chosenPieceIdx] = nil
+			}
 		}
 	}
 	for r := range grid {
