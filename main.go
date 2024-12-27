@@ -113,7 +113,15 @@ func (g *Game) Update() error {
 			g.pressX, g.pressY = ebiten.TouchPosition(id)
 		}
 		for _, id := range dragTouchIDs {
-			g.dragX, g.dragY = ebiten.TouchPosition(id)
+			dragX, dragY := ebiten.TouchPosition(id)
+			// Offset touch dragY to be above your finger by a bit more than the height of the piece to see where you're
+			// dragging it
+			var dragYOffset int
+			chosenPiece := g.chosenPiece()
+			if chosenPiece != nil {
+				dragYOffset = (chosenPiece.Height() + 1) * cellSize
+			}
+			g.dragX, g.dragY = dragX, dragY-dragYOffset
 		}
 		if len(releasedTouchIDs) > 0 {
 			g.releaseX, g.releaseY = g.dragX, g.dragY
