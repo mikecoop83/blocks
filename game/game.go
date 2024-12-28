@@ -256,12 +256,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	// High score at top left
 	op := &ebiten.DrawImageOptions{}
-	const firstPlaceHeight = topAreaHeight * 0.75
-	const firstPlaceWidth = topAreaHeight * 0.75
-	scaleX := firstPlaceWidth / float64(resources.FirstPlaceImage.Bounds().Dx())
-	scaleY := firstPlaceHeight / float64(resources.FirstPlaceImage.Bounds().Dy())
+	const iconHeight = topAreaHeight * 0.75
+	const iconWidth = topAreaHeight * 0.75
+	scaleX := iconWidth / float64(resources.FirstPlaceImage.Bounds().Dx())
+	scaleY := iconHeight / float64(resources.FirstPlaceImage.Bounds().Dy())
 	op.GeoM.Scale(scaleX, scaleY)
-	op.GeoM.Translate(0, (topAreaHeight-firstPlaceHeight)/2)
+	op.GeoM.Translate(0, (topAreaHeight-iconHeight)/2)
 
 	screen.DrawImage(resources.FirstPlaceImage, op)
 
@@ -277,7 +277,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		resources.TextFontFace,
 		// Text offset is at a weird spot towards the bottom of the letters, so we need to offset it by the height of the
 		// text to center it.
-		firstPlaceWidth, int(((topAreaHeight-highScoreHeight)/2)+highScoreHeight),
+		iconWidth, int(((topAreaHeight-highScoreHeight)/2)+highScoreHeight),
 		highScoreColor,
 	)
 
@@ -292,6 +292,36 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		int(boardWidth-scoreWidth-20), int(((topAreaHeight-scoreHeight)/2)+scoreHeight),
 		color.Black,
 	)
+
+	// Game over in the middle
+	if g.gameOver {
+		gameOverMsg := "Game Over"
+		gameOverWidth, gameOverHeight := getTextSize(gameOverMsg, resources.TextFontFace)
+		text.Draw(
+			screen,
+			gameOverMsg,
+			resources.TextFontFace,
+			int((boardWidth-gameOverWidth)/2), int(((topAreaHeight-gameOverHeight)/2)+gameOverHeight),
+			color.Black,
+		)
+		// put the restart image next to the game over text
+		restartImageWidth := iconWidth
+		restartImageHeight := iconHeight
+		scaleX := restartImageWidth / float64(resources.RestartImage.Bounds().Dx())
+		scaleY := restartImageHeight / float64(resources.RestartImage.Bounds().Dy())
+		restartImageX := float64(boardWidth - scoreWidth - fixed.Int26_6(restartImageWidth) - 110)
+		restartImageY := (topAreaHeight - iconHeight) / 2
+		op := &ebiten.DrawImageOptions{}
+		op.Filter = ebiten.FilterLinear
+		op.GeoM.Scale(scaleX, scaleY)
+		op.GeoM.Translate(restartImageX, restartImageY)
+		screen.DrawImage(resources.RestartImage, op)
+
+		if g.releaseX >= int(restartImageX) && g.releaseX <= int(restartImageX+restartImageWidth) &&
+			g.releaseY >= int(restartImageY) && g.releaseY <= int(restartImageY+restartImageHeight) {
+			g.Reset()
+		}
+	}
 
 	const boardYOffset = topAreaHeight
 
@@ -445,6 +475,17 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			boardWidth, float32(boardYOffset+i*cellSize),
 			1,
 			color.Black,
+			false,
+		)
+	}
+
+	// If game over, gray out the board with transparency
+	if g.gameOver {
+		vector.DrawFilledRect(
+			screen,
+			0, float32(boardYOffset),
+			boardWidth, boardHeight,
+			color.RGBA{R: 0, G: 0, B: 0, A: 0x80},
 			false,
 		)
 	}
