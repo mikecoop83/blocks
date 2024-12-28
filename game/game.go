@@ -489,27 +489,30 @@ func (g *Game) drawHeader(screen *ebiten.Image) {
 	if g.gameOver {
 		gameOverMsg := "Game Over"
 		gameOverWidth, gameOverHeight := getTextSize(gameOverMsg, resources.TextFontFace)
+		restartImageWidth := iconWidth
+		restartImageHeight := iconHeight
+		gameOverX := int((boardWidth - gameOverWidth - fixed.Int26_6(restartImageWidth)) / 2)
+		gameOverY := int(((topAreaHeight - gameOverHeight) / 2) + gameOverHeight)
 		text.Draw(
 			screen,
 			gameOverMsg,
 			resources.TextFontFace,
-			int((boardWidth-gameOverWidth)/2), int(((topAreaHeight-gameOverHeight)/2)+gameOverHeight),
+			gameOverX,
+			gameOverY,
 			color.Black,
 		)
 		// put the restart image next to the game over text
-		restartImageWidth := iconWidth
-		restartImageHeight := iconHeight
 		scaleX := restartImageWidth / float64(resources.RestartImage.Bounds().Dx())
 		scaleY := restartImageHeight / float64(resources.RestartImage.Bounds().Dy())
-		restartImageX := float64(boardWidth - scoreWidth - fixed.Int26_6(restartImageWidth) - 110)
+		restartImageX := gameOverX + int(gameOverWidth) + 20
 		restartImageY := (topAreaHeight - iconHeight) / 2
 		op := &ebiten.DrawImageOptions{}
 		op.Filter = ebiten.FilterLinear
 		op.GeoM.Scale(scaleX, scaleY)
-		op.GeoM.Translate(restartImageX, restartImageY)
+		op.GeoM.Translate(float64(restartImageX), restartImageY)
 		screen.DrawImage(resources.RestartImage, op)
 
-		if g.releaseX >= int(restartImageX) && g.releaseX <= int(restartImageX+restartImageWidth) &&
+		if g.releaseX >= restartImageX && g.releaseX <= restartImageX+int(restartImageWidth) &&
 			g.releaseY >= int(restartImageY) && g.releaseY <= int(restartImageY+restartImageHeight) {
 			g.Reset()
 		}
