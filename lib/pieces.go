@@ -25,6 +25,9 @@ func init() {
 		/* 13 */ parsePiece("# \n##"),
 		/* 14 */ parsePiece("#  \n # \n  #"),
 		/* 15 */ parsePiece("# \n #\n"),
+		/* 16 */ parsePiece("###\n###"),
+		/* 17 */ parsePiece("#  \n#  \n###"),
+		/* 18 */ parsePiece("  #\n  #\n###"),
 	}
 }
 
