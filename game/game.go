@@ -2,11 +2,8 @@ package game
 
 import (
 	"image/color"
-	"math/rand"
-	"strconv"
 	"time"
 
-	"github.com/mikecoop83/blocks/persist"
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 	"golang.org/x/text/language"
@@ -86,20 +83,6 @@ type Game struct {
 	cheated   bool
 }
 
-func maybeGetHighScore() int64 {
-	highScoreStr, err := persist.Load("highscore")
-	if err != nil {
-		log("failed to load high score: %v", err)
-		return 0
-	}
-	highScore, err := strconv.ParseInt(highScoreStr, 10, 64)
-	if err != nil {
-		log("failed to parse high score: %v", err)
-		return 0
-	}
-	return highScore
-}
-
 func (g *Game) Reset() {
 	g.pieceOptions = [numPieceOptions]*lib.Piece{}
 	g.chosenPieceIdx = -1
@@ -127,24 +110,11 @@ func (g *Game) chosenPiece() *lib.Piece {
 	return g.pieceOptions[g.chosenPieceIdx]
 }
 
-func getRandomRotatedPiece() *lib.Piece {
-	randPieceIdx := rand.Intn(len(lib.AllPieces))
-	piece := lib.AllPieces[randPieceIdx]
-	rotateTimes := rand.Intn(4)
-	for i := 0; i < rotateTimes; i++ {
-		piece = piece.Rotate()
-	}
-	return &piece
-}
-
 // Update is called every tick (1/60 seconds by default) to tick the game state.
 func (g *Game) Update() error {
 	if !g.cheated && g.score > g.highScore {
 		g.highScore = g.score
-		err := persist.Store("highscore", strconv.FormatInt(g.highScore, 10))
-		if err != nil {
-			log("failed to save high score: %v", err)
-		}
+		maybeUpdateHighScore(g.highScore)
 	}
 	g.cheating = ebiten.IsKeyPressed(ebiten.KeyMeta) && ebiten.IsKeyPressed(ebiten.KeyShift)
 	var pressedTouchIDs, dragTouchIDs, releasedTouchIDs []ebiten.TouchID
@@ -194,7 +164,8 @@ func (g *Game) Update() error {
 	// If no pieces to choose, get numPieceOptions new pieces and set first piece to be chosen.
 	if g.pieceOptions[0] == nil && g.pieceOptions[1] == nil && g.pieceOptions[2] == nil {
 		for i := 0; i < numPieceOptions; i++ {
-			g.pieceOptions[i] = getRandomRotatedPiece()
+			randomPiece := lib.RandomRotatedPiece()
+			g.pieceOptions[i] = &randomPiece
 		}
 	}
 	// Check if the game is over.
@@ -243,114 +214,112 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		}
 		g.releaseX, g.releaseY = -1, -1
 	}()
-	// Draw the background.
-	background := white
-	vector.DrawFilledRect(
-		screen,
-		0, 0,
-		float32(screen.Bounds().Max.X),
-		float32(screen.Bounds().Max.Y),
-		background,
-		false,
-	)
 
-	// High score at top left
-	op := &ebiten.DrawImageOptions{}
-	const iconHeight = topAreaHeight * 0.75
-	const iconWidth = topAreaHeight * 0.75
-	scaleX := iconWidth / float64(resources.FirstPlaceImage.Bounds().Dx())
-	scaleY := iconHeight / float64(resources.FirstPlaceImage.Bounds().Dy())
-	op.GeoM.Scale(scaleX, scaleY)
-	op.GeoM.Translate(0, (topAreaHeight-iconHeight)/2)
+	g.drawBackground(screen)
 
-	screen.DrawImage(resources.FirstPlaceImage, op)
+	g.drawHeader(screen)
 
-	highScoreMsg := commaFormatter.Sprintf("%d", g.highScore)
-	_, highScoreHeight := getTextSize(highScoreMsg, resources.TextFontFace)
-	var highScoreColor color.Color = color.Black
-	if g.cheated {
-		highScoreColor = reddishGray
+	g.drawClearedRowsAndCols(screen)
+
+	g.drawBoard(screen)
+
+	g.drawOverlay(screen)
+
+	g.drawPieceOptions(screen)
+}
+
+func (g *Game) drawPieceOptions(screen *ebiten.Image) {
+	// Draw the bottom area with the piece options
+	const bottomAreaOffset = topAreaHeight + boardHeight
+	const pieceOptionCellSize = cellSize * 0.5
+	pieceOptionWidth := boardWidth / numPieceOptions
+	for p, piece := range g.pieceOptions {
+		if piece == nil {
+			continue
+		}
+		pieceOptionColor := cellStateToColor[lib.Unchosen]
+		if p == g.chosenPieceIdx && g.releaseX >= 0 && g.releaseY >= 0 {
+			pieceOptionColor = cellStateToColor[lib.Pending]
+		}
+		yOffset := (bottomAreaHeight - piece.Height()*pieceOptionCellSize) / 2
+		xOffset := (pieceOptionWidth - piece.Width()*pieceOptionCellSize) / 2
+		// If the mouse is hovering over an unselected piece, change the color.  Select it if it was just clicked.
+		pieceX := xOffset + p*pieceOptionWidth
+		pieceY := bottomAreaOffset + yOffset
+		// Break the bottom area into large sections so we don't require touching the piece itself to drag it on to the
+		// board
+		pieceAreaX := p * pieceOptionWidth
+		pieceAreaY := bottomAreaOffset
+		if g.pressX >= pieceAreaX && g.pressX < pieceAreaX+pieceOptionWidth &&
+			g.pressY >= pieceAreaY && g.pressY < pieceAreaY+bottomAreaHeight {
+			pieceOptionColor = cellStateToColor[lib.Hovering]
+			g.chosenPieceIdx = p
+		}
+		for r := range piece.Shape {
+			for c := range piece.Shape[r] {
+				if !piece.Shape[r][c] {
+					continue
+				}
+				vector.DrawFilledRect(
+					screen,
+					float32(pieceX+c*pieceOptionCellSize),
+					float32(pieceY+r*pieceOptionCellSize),
+					float32(pieceOptionCellSize),
+					float32(pieceOptionCellSize),
+					pieceOptionColor,
+					false,
+				)
+				// Draw rectangle around each filled cell.
+				vector.StrokeRect(
+					screen,
+					float32(pieceX+c*pieceOptionCellSize),
+					float32(pieceY+r*pieceOptionCellSize),
+					float32(pieceOptionCellSize),
+					float32(pieceOptionCellSize),
+					1,
+					color.Black,
+					false,
+				)
+			}
+		}
 	}
-	text.Draw(
-		screen,
-		highScoreMsg,
-		resources.TextFontFace,
-		// Text offset is at a weird spot towards the bottom of the letters, so we need to offset it by the height of the
-		// text to center it.
-		iconWidth, int(((topAreaHeight-highScoreHeight)/2)+highScoreHeight),
-		highScoreColor,
-	)
+}
 
-	// Score at top right
-	scoreMsg := commaFormatter.Sprintf("%d", g.score)
-	scoreWidth, scoreHeight := getTextSize(scoreMsg, resources.TextFontFace)
-	text.Draw(
-		screen,
-		scoreMsg,
-		resources.TextFontFace,
-		// Offset it from the right edge a bit
-		int(boardWidth-scoreWidth-20), int(((topAreaHeight-scoreHeight)/2)+scoreHeight),
-		color.Black,
-	)
-
-	// Game over in the middle
-	if g.gameOver {
-		gameOverMsg := "Game Over"
-		gameOverWidth, gameOverHeight := getTextSize(gameOverMsg, resources.TextFontFace)
-		text.Draw(
+func (g *Game) drawOverlay(screen *ebiten.Image) {
+	// Draw gridlines
+	for i := 0; i <= lib.BoardSize; i++ {
+		// Horizontal line
+		vector.StrokeLine(
 			screen,
-			gameOverMsg,
-			resources.TextFontFace,
-			int((boardWidth-gameOverWidth)/2), int(((topAreaHeight-gameOverHeight)/2)+gameOverHeight),
+			float32(i*cellSize), float32(topAreaHeight),
+			float32(i*cellSize), float32(topAreaHeight+boardHeight),
+			1,
 			color.Black,
+			false,
 		)
-		// put the restart image next to the game over text
-		restartImageWidth := iconWidth
-		restartImageHeight := iconHeight
-		scaleX := restartImageWidth / float64(resources.RestartImage.Bounds().Dx())
-		scaleY := restartImageHeight / float64(resources.RestartImage.Bounds().Dy())
-		restartImageX := float64(boardWidth - scoreWidth - fixed.Int26_6(restartImageWidth) - 110)
-		restartImageY := (topAreaHeight - iconHeight) / 2
-		op := &ebiten.DrawImageOptions{}
-		op.Filter = ebiten.FilterLinear
-		op.GeoM.Scale(scaleX, scaleY)
-		op.GeoM.Translate(restartImageX, restartImageY)
-		screen.DrawImage(resources.RestartImage, op)
-
-		if g.releaseX >= int(restartImageX) && g.releaseX <= int(restartImageX+restartImageWidth) &&
-			g.releaseY >= int(restartImageY) && g.releaseY <= int(restartImageY+restartImageHeight) {
-			g.Reset()
-		}
-	}
-
-	const boardYOffset = topAreaHeight
-
-	// Animate the cleared rows and columns
-	for r, entity := range g.clearedRows {
-		if entity == nil {
-			continue
-		}
-		vector.DrawFilledRect(
+		// Vertical line
+		vector.StrokeLine(
 			screen,
-			0, float32(boardYOffset+r*cellSize),
-			boardWidth, cellSize,
-			entity.currentColor,
+			0, float32(topAreaHeight+i*cellSize),
+			boardWidth, float32(topAreaHeight+i*cellSize),
+			1,
+			color.Black,
 			false,
 		)
 	}
-	for c, entity := range g.clearedCols {
-		if entity == nil {
-			continue
-		}
+	// If game over, gray out the board with transparency
+	if g.gameOver {
 		vector.DrawFilledRect(
 			screen,
-			float32(c*cellSize), float32(boardYOffset),
-			cellSize, boardHeight,
-			entity.currentColor,
+			0, float32(topAreaHeight),
+			boardWidth, boardHeight,
+			color.RGBA{R: 0, G: 0, B: 0, A: 0x80},
 			false,
 		)
 	}
+}
 
+func (g *Game) drawBoard(screen *ebiten.Image) {
 	grid := g.board.GetGrid()
 
 	// Either drag or click is the current mouse position.
@@ -360,13 +329,13 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 	onBoard := mouseX >= 0 &&
 		mouseX < boardWidth &&
-		mouseY >= boardYOffset &&
-		mouseY < boardYOffset+boardHeight
+		mouseY >= topAreaHeight &&
+		mouseY < topAreaHeight+boardHeight
 
 	if onBoard && g.chosenPiece() != nil {
 		piece := *g.chosenPiece()
 		cellC := mouseX / cellSize
-		cellR := (mouseY - boardYOffset) / cellSize
+		cellR := (mouseY - topAreaHeight) / cellSize
 
 		// Clamp the piece to the board if the mouse is on the board
 		if cellC < 0 {
@@ -440,110 +409,123 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			}
 			vector.DrawFilledRect(
 				screen,
-				float32(c*cellSize), float32(boardYOffset+r*cellSize),
+				float32(c*cellSize), float32(topAreaHeight+r*cellSize),
 				cellSize, cellSize,
 				cellColor,
 				false,
 			)
-			// Draw rectangle around each filled cell.
-			vector.StrokeRect(
-				screen,
-				float32(c*cellSize), float32(boardYOffset+r*cellSize),
-				cellSize, cellSize,
-				1,
-				color.Black,
-				false,
-			)
 		}
 	}
+}
 
-	// Draw gridlines
-	for i := 0; i <= lib.BoardSize; i++ {
-		// Horizontal line
-		vector.StrokeLine(
-			screen,
-			float32(i*cellSize), float32(boardYOffset),
-			float32(i*cellSize), float32(boardYOffset+boardHeight),
-			1,
-			color.Black,
-			false,
-		)
-		// Vertical line
-		vector.StrokeLine(
-			screen,
-			0, float32(boardYOffset+i*cellSize),
-			boardWidth, float32(boardYOffset+i*cellSize),
-			1,
-			color.Black,
-			false,
-		)
-	}
-
-	// If game over, gray out the board with transparency
-	if g.gameOver {
-		vector.DrawFilledRect(
-			screen,
-			0, float32(boardYOffset),
-			boardWidth, boardHeight,
-			color.RGBA{R: 0, G: 0, B: 0, A: 0x80},
-			false,
-		)
-	}
-
-	// Draw the bottom area with the piece options
-	const bottomAreaOffset = topAreaHeight + boardHeight
-	const pieceOptionCellSize = cellSize * 0.5
-	pieceOptionWidth := boardWidth / numPieceOptions
-	for p, piece := range g.pieceOptions {
-		if piece == nil {
+func (g *Game) drawClearedRowsAndCols(screen *ebiten.Image) {
+	for r, entity := range g.clearedRows {
+		if entity == nil {
 			continue
 		}
-		pieceOptionColor := cellStateToColor[lib.Unchosen]
-		if p == g.chosenPieceIdx && g.releaseX >= 0 && g.releaseY >= 0 {
-			pieceOptionColor = cellStateToColor[lib.Pending]
+		vector.DrawFilledRect(
+			screen,
+			0, float32(topAreaHeight+r*cellSize),
+			boardWidth, cellSize,
+			entity.currentColor,
+			false,
+		)
+	}
+	for c, entity := range g.clearedCols {
+		if entity == nil {
+			continue
 		}
-		yOffset := (bottomAreaHeight - piece.Height()*pieceOptionCellSize) / 2
-		xOffset := (pieceOptionWidth - piece.Width()*pieceOptionCellSize) / 2
-		// If the mouse is hovering over an unselected piece, change the color.  Select it if it was just clicked.
-		pieceX := xOffset + p*pieceOptionWidth
-		pieceY := bottomAreaOffset + yOffset
-		// Break the bottom area into large sections so we don't require touching the piece itself to drag it on to the
-		// board
-		pieceAreaX := p * pieceOptionWidth
-		pieceAreaY := bottomAreaOffset
-		if g.pressX >= pieceAreaX && g.pressX < pieceAreaX+pieceOptionWidth &&
-			g.pressY >= pieceAreaY && g.pressY < pieceAreaY+bottomAreaHeight {
-			pieceOptionColor = cellStateToColor[lib.Hovering]
-			g.chosenPieceIdx = p
-		}
-		for r := range piece.Shape {
-			for c := range piece.Shape[r] {
-				if !piece.Shape[r][c] {
-					continue
-				}
-				vector.DrawFilledRect(
-					screen,
-					float32(pieceX+c*pieceOptionCellSize),
-					float32(pieceY+r*pieceOptionCellSize),
-					float32(pieceOptionCellSize),
-					float32(pieceOptionCellSize),
-					pieceOptionColor,
-					false,
-				)
-				// Draw rectangle around each filled cell.
-				vector.StrokeRect(
-					screen,
-					float32(pieceX+c*pieceOptionCellSize),
-					float32(pieceY+r*pieceOptionCellSize),
-					float32(pieceOptionCellSize),
-					float32(pieceOptionCellSize),
-					1,
-					color.Black,
-					false,
-				)
-			}
+		vector.DrawFilledRect(
+			screen,
+			float32(c*cellSize), float32(topAreaHeight),
+			cellSize, boardHeight,
+			entity.currentColor,
+			false,
+		)
+	}
+}
+
+func (g *Game) drawHeader(screen *ebiten.Image) {
+	// High score at top left
+	op := &ebiten.DrawImageOptions{}
+	const iconHeight = topAreaHeight * 0.75
+	const iconWidth = topAreaHeight * 0.75
+	scaleX := iconWidth / float64(resources.FirstPlaceImage.Bounds().Dx())
+	scaleY := iconHeight / float64(resources.FirstPlaceImage.Bounds().Dy())
+	op.GeoM.Scale(scaleX, scaleY)
+	op.GeoM.Translate(0, (topAreaHeight-iconHeight)/2)
+
+	screen.DrawImage(resources.FirstPlaceImage, op)
+
+	highScoreMsg := commaFormatter.Sprintf("%d", g.highScore)
+	_, highScoreHeight := getTextSize(highScoreMsg, resources.TextFontFace)
+	var highScoreColor color.Color = color.Black
+	if g.cheated {
+		highScoreColor = reddishGray
+	}
+	text.Draw(
+		screen,
+		highScoreMsg,
+		resources.TextFontFace,
+		// Text offset is at a weird spot towards the bottom of the letters, so we need to offset it by the height of the
+		// text to center it.
+		iconWidth, int(((topAreaHeight-highScoreHeight)/2)+highScoreHeight),
+		highScoreColor,
+	)
+
+	// Score at top right
+	scoreMsg := commaFormatter.Sprintf("%d", g.score)
+	scoreWidth, scoreHeight := getTextSize(scoreMsg, resources.TextFontFace)
+	text.Draw(
+		screen,
+		scoreMsg,
+		resources.TextFontFace,
+		// Offset it from the right edge a bit
+		int(boardWidth-scoreWidth-20), int(((topAreaHeight-scoreHeight)/2)+scoreHeight),
+		color.Black,
+	)
+
+	// Game over in the middle
+	if g.gameOver {
+		gameOverMsg := "Game Over"
+		gameOverWidth, gameOverHeight := getTextSize(gameOverMsg, resources.TextFontFace)
+		text.Draw(
+			screen,
+			gameOverMsg,
+			resources.TextFontFace,
+			int((boardWidth-gameOverWidth)/2), int(((topAreaHeight-gameOverHeight)/2)+gameOverHeight),
+			color.Black,
+		)
+		// put the restart image next to the game over text
+		restartImageWidth := iconWidth
+		restartImageHeight := iconHeight
+		scaleX := restartImageWidth / float64(resources.RestartImage.Bounds().Dx())
+		scaleY := restartImageHeight / float64(resources.RestartImage.Bounds().Dy())
+		restartImageX := float64(boardWidth - scoreWidth - fixed.Int26_6(restartImageWidth) - 110)
+		restartImageY := (topAreaHeight - iconHeight) / 2
+		op := &ebiten.DrawImageOptions{}
+		op.Filter = ebiten.FilterLinear
+		op.GeoM.Scale(scaleX, scaleY)
+		op.GeoM.Translate(restartImageX, restartImageY)
+		screen.DrawImage(resources.RestartImage, op)
+
+		if g.releaseX >= int(restartImageX) && g.releaseX <= int(restartImageX+restartImageWidth) &&
+			g.releaseY >= int(restartImageY) && g.releaseY <= int(restartImageY+restartImageHeight) {
+			g.Reset()
 		}
 	}
+}
+
+func (g *Game) drawBackground(screen *ebiten.Image) {
+	background := white
+	vector.DrawFilledRect(
+		screen,
+		0, 0,
+		float32(screen.Bounds().Max.X),
+		float32(screen.Bounds().Max.Y),
+		background,
+		false,
+	)
 }
 
 func getTextSize(scoreMsg string, face font.Face) (fixed.Int26_6, fixed.Int26_6) {

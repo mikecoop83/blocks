@@ -2,6 +2,7 @@ package lib
 
 import (
 	_ "embed"
+	"math/rand"
 	"strings"
 )
 
@@ -49,4 +50,14 @@ func parsePiece(pieceStr string) Piece {
 	return Piece{
 		Shape: shape,
 	}
+}
+
+func RandomRotatedPiece() Piece {
+	randPieceIdx := rand.Intn(len(AllPieces))
+	piece := AllPieces[randPieceIdx]
+	rotateTimes := rand.Intn(4)
+	for i := 0; i < rotateTimes; i++ {
+		piece = piece.Rotate()
+	}
+	return piece
 }
