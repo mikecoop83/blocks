@@ -29,6 +29,7 @@ var (
 )
 
 const (
+	splashDuration   = 2 * time.Second
 	cellSize         = 100
 	topAreaHeight    = 100
 	numPieceOptions  = 3
@@ -81,6 +82,8 @@ type Game struct {
 	gameOver  bool
 	cheating  bool
 	cheated   bool
+
+	splashStart time.Time
 }
 
 func (g *Game) Reset() {
@@ -112,6 +115,10 @@ func (g *Game) chosenPiece() *lib.Piece {
 
 // Update is called every tick (1/60 seconds by default) to tick the game state.
 func (g *Game) Update() error {
+	if g.splashStart.IsZero() {
+		g.splashStart = time.Now()
+	}
+
 	if !g.cheated && g.score > g.highScore {
 		g.highScore = g.score
 		maybeUpdateHighScore(g.highScore)
@@ -208,14 +215,23 @@ outer:
 
 // Draw is called every frame to render the screen.
 func (g *Game) Draw(screen *ebiten.Image) {
+	g.drawBackground(screen)
+
+	if time.Since(g.splashStart) < splashDuration {
+		g.drawSplash(screen)
+		return
+	}
+
+	g.drawGame(screen)
+}
+
+func (g *Game) drawGame(screen *ebiten.Image) {
 	defer func() {
 		if g.releaseX >= 0 && g.releaseY >= 0 {
 			g.chosenPieceIdx = -1
 		}
 		g.releaseX, g.releaseY = -1, -1
 	}()
-
-	g.drawBackground(screen)
 
 	g.drawHeader(screen)
 
@@ -543,4 +559,19 @@ func getTextSize(scoreMsg string, face font.Face) (fixed.Int26_6, fixed.Int26_6)
 // Layout returns the logical screen dimensions. The game window will scale to fit this size.
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 	return boardWidth, topAreaHeight + boardHeight + bottomAreaHeight
+}
+
+func (g *Game) drawSplash(screen *ebiten.Image) {
+	// Draw the splash screen
+	splashBounds := resources.SplashImage.Bounds()
+	scaleX := (boardWidth - 50) / float64(splashBounds.Dx())
+	scaleY := boardHeight / float64(splashBounds.Dy())
+	splashX := 25
+	splashY := topAreaHeight
+	op := &ebiten.DrawImageOptions{}
+	op.Filter = ebiten.FilterLinear
+	log("sX: %v, sY: %v, x: %v, y: %v", scaleX, scaleY, splashX, splashY)
+	op.GeoM.Scale(scaleX, scaleY)
+	op.GeoM.Translate(float64(splashX), float64(splashY))
+	screen.DrawImage(resources.SplashImage, op)
 }
