@@ -4,6 +4,7 @@ import (
 	"image/color"
 	"time"
 
+	"github.com/mikecoop83/blocks/persist"
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 	"golang.org/x/text/language"
@@ -18,12 +19,13 @@ import (
 )
 
 var (
-	white       = color.RGBA{R: 0xf0, G: 0xf0, B: 0xf0, A: 0xff}
+	offWhite    = color.RGBA{R: 0xf0, G: 0xf0, B: 0xf0, A: 0xff}
 	green       = color.RGBA{R: 0x00, G: 0xcc, B: 0x66, A: 0xff}
 	red         = color.RGBA{R: 0xff, G: 0x66, B: 0x66, A: 0xff}
 	blue        = color.RGBA{R: 0x66, G: 0x99, B: 0xff, A: 0xff}
 	orange      = color.RGBA{R: 0xff, G: 0xa5, B: 0x00, A: 0xff}
 	gray        = color.RGBA{R: 0x80, G: 0x80, B: 0x80, A: 0xff}
+	darkGray    = color.RGBA{R: 0x40, G: 0x40, B: 0x40, A: 0xff}
 	paleYellow  = color.RGBA{R: 0xff, G: 0xff, B: 0xcc, A: 0xff}
 	reddishGray = color.RGBA{R: 0x99, G: 0x66, B: 0x66, A: 0xff}
 )
@@ -40,8 +42,23 @@ const (
 	WindowHeight     = topAreaHeight + boardHeight + bottomAreaHeight
 )
 
+var displayModeToCellColor = map[DisplayMode]map[lib.CellState]color.Color{
+	DisplayModeNormal: cellStateToColor,
+	DisplayModeDark:   darkCellStateToColor,
+}
+
+var displayModeToBackgroundColor = map[DisplayMode]color.Color{
+	DisplayModeNormal: offWhite,
+	DisplayModeDark:   darkGray,
+}
+
+var displayModeToForegroundColor = map[DisplayMode]color.Color{
+	DisplayModeNormal: color.Black,
+	DisplayModeDark:   offWhite,
+}
+
 var cellStateToColor = map[lib.CellState]color.Color{
-	lib.Empty:    white,
+	lib.Empty:    offWhite,
 	lib.Pending:  green,
 	lib.Invalid:  red,
 	lib.FullLine: orange,
@@ -50,8 +67,8 @@ var cellStateToColor = map[lib.CellState]color.Color{
 	lib.Hovering: paleYellow,
 }
 
-var cheatingCellStateToColor = map[lib.CellState]color.Color{
-	lib.Empty:    reddishGray,
+var darkCellStateToColor = map[lib.CellState]color.Color{
+	lib.Empty:    darkGray,
 	lib.Pending:  green,
 	lib.Invalid:  red,
 	lib.FullLine: orange,
@@ -59,8 +76,24 @@ var cheatingCellStateToColor = map[lib.CellState]color.Color{
 	lib.Unchosen: gray,
 	lib.Hovering: paleYellow,
 }
-
 var commaFormatter = message.NewPrinter(language.English)
+
+type DisplayMode int
+
+const (
+	DisplayModeNormal DisplayMode = iota
+	DisplayModeDark
+)
+
+var displayModeToName = map[DisplayMode]string{
+	DisplayModeNormal: "normal",
+	DisplayModeDark:   "dark",
+}
+
+var nameToDisplayMode = map[string]DisplayMode{
+	"normal": DisplayModeNormal,
+	"dark":   DisplayModeDark,
+}
 
 // Game struct represents the game state.
 type Game struct {
@@ -77,24 +110,30 @@ type Game struct {
 	releaseX, releaseY int
 	chosenPieceIdx     int
 
-	score     int64
-	highScore int64
-	gameOver  bool
-	cheating  bool
-	cheated   bool
+	score       int64
+	highScore   int64
+	gameOver    bool
+	cheating    bool
+	cheated     bool
+	displayMode DisplayMode
 
 	splashStart time.Time
 }
 
 func (g *Game) Reset() {
+	newBoard := lib.NewBoard()
+	g.board = &newBoard
 	g.pieceOptions = [numPieceOptions]*lib.Piece{}
 	g.chosenPieceIdx = -1
 	g.score = 0
 	g.gameOver = false
-	newBoard := lib.NewBoard()
-	g.board = &newBoard
 	g.highScore = maybeGetHighScore()
 	g.cheated = false
+	displayModeText, err := persist.Load("displaymode")
+	if err != nil {
+		log("error loading display mode: %v", err)
+	}
+	g.displayMode = nameToDisplayMode[displayModeText]
 }
 
 func New() ebiten.Game {
@@ -115,6 +154,13 @@ func (g *Game) chosenPiece() *lib.Piece {
 
 // Update is called every tick (1/60 seconds by default) to tick the game state.
 func (g *Game) Update() error {
+	if inpututil.IsKeyJustReleased(ebiten.KeyM) {
+		g.displayMode = (g.displayMode + 1) % 2
+		err := persist.Store("displaymode", displayModeToName[g.displayMode])
+		if err != nil {
+			log("error storing display mode: %v", err)
+		}
+	}
 	if g.splashStart.IsZero() {
 		g.splashStart = time.Now()
 	}
@@ -293,7 +339,7 @@ func (g *Game) drawPieceOptions(screen *ebiten.Image) {
 					float32(pieceOptionCellSize),
 					float32(pieceOptionCellSize),
 					1,
-					color.Black,
+					displayModeToForegroundColor[g.displayMode],
 					false,
 				)
 			}
@@ -310,7 +356,7 @@ func (g *Game) drawOverlay(screen *ebiten.Image) {
 			float32(i*cellSize), float32(topAreaHeight),
 			float32(i*cellSize), float32(topAreaHeight+boardHeight),
 			1,
-			color.Black,
+			displayModeToForegroundColor[g.displayMode],
 			false,
 		)
 		// Vertical line
@@ -319,7 +365,7 @@ func (g *Game) drawOverlay(screen *ebiten.Image) {
 			0, float32(topAreaHeight+i*cellSize),
 			boardWidth, float32(topAreaHeight+i*cellSize),
 			1,
-			color.Black,
+			displayModeToForegroundColor[g.displayMode],
 			false,
 		)
 	}
@@ -419,15 +465,12 @@ func (g *Game) drawBoard(screen *ebiten.Image) {
 				continue
 			}
 			state := grid[r][c]
-			cellColor := cellStateToColor[state]
-			if g.cheating {
-				cellColor = cheatingCellStateToColor[state]
-			}
+			displayColors := displayModeToCellColor[g.displayMode]
 			vector.DrawFilledRect(
 				screen,
 				float32(c*cellSize), float32(topAreaHeight+r*cellSize),
 				cellSize, cellSize,
-				cellColor,
+				displayColors[state],
 				false,
 			)
 		}
@@ -475,7 +518,7 @@ func (g *Game) drawHeader(screen *ebiten.Image) {
 
 	highScoreMsg := commaFormatter.Sprintf("%d", g.highScore)
 	_, highScoreHeight := getTextSize(highScoreMsg, resources.TextFontFace)
-	var highScoreColor color.Color = color.Black
+	highScoreColor := displayModeToForegroundColor[g.displayMode]
 	if g.cheated {
 		highScoreColor = reddishGray
 	}
@@ -498,7 +541,7 @@ func (g *Game) drawHeader(screen *ebiten.Image) {
 		resources.TextFontFace,
 		// Offset it from the right edge a bit
 		int(boardWidth-scoreWidth-20), int(((topAreaHeight-scoreHeight)/2)+scoreHeight),
-		color.Black,
+		displayModeToForegroundColor[g.displayMode],
 	)
 
 	// Game over in the middle
@@ -515,7 +558,7 @@ func (g *Game) drawHeader(screen *ebiten.Image) {
 			resources.TextFontFace,
 			gameOverX,
 			gameOverY,
-			color.Black,
+			displayModeToForegroundColor[g.displayMode],
 		)
 		// put the restart image next to the game over text
 		scaleX := restartImageWidth / float64(resources.RestartImage.Bounds().Dx())
@@ -536,13 +579,12 @@ func (g *Game) drawHeader(screen *ebiten.Image) {
 }
 
 func (g *Game) drawBackground(screen *ebiten.Image) {
-	background := white
 	vector.DrawFilledRect(
 		screen,
 		0, 0,
 		float32(screen.Bounds().Max.X),
 		float32(screen.Bounds().Max.Y),
-		background,
+		displayModeToBackgroundColor[g.displayMode],
 		false,
 	)
 }
@@ -570,7 +612,6 @@ func (g *Game) drawSplash(screen *ebiten.Image) {
 	splashY := topAreaHeight
 	op := &ebiten.DrawImageOptions{}
 	op.Filter = ebiten.FilterLinear
-	log("sX: %v, sY: %v, x: %v, y: %v", scaleX, scaleY, splashX, splashY)
 	op.GeoM.Scale(scaleX, scaleY)
 	op.GeoM.Translate(float64(splashX), float64(splashY))
 	screen.DrawImage(resources.SplashImage, op)
