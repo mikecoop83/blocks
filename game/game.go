@@ -178,6 +178,13 @@ func (g *Game) Update() error {
 		g.touchEnabled = true
 	}
 	if g.touchEnabled {
+		if len(pressedTouchIDs) > 2 {
+			g.displayMode = (g.displayMode + 1) % 2
+			err := persist.Store("displaymode", displayModeToName[g.displayMode])
+			if err != nil {
+				log("error storing display mode: %v", err)
+			}
+		}
 		for _, id := range pressedTouchIDs {
 			g.pressX, g.pressY = ebiten.TouchPosition(id)
 		}
