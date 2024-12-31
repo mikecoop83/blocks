@@ -154,12 +154,15 @@ func (g *Game) chosenPiece() *lib.Piece {
 
 // Update is called every tick (1/60 seconds by default) to tick the game state.
 func (g *Game) Update() error {
-	if inpututil.IsKeyJustReleased(ebiten.KeyM) {
+	switchMode := func() {
 		g.displayMode = (g.displayMode + 1) % 2
 		err := persist.Store("displaymode", displayModeToName[g.displayMode])
 		if err != nil {
 			log("error storing display mode: %v", err)
 		}
+	}
+	if inpututil.IsKeyJustReleased(ebiten.KeyM) {
+		switchMode()
 	}
 	if g.splashStart.IsZero() {
 		g.splashStart = time.Now()
@@ -178,12 +181,9 @@ func (g *Game) Update() error {
 		g.touchEnabled = true
 	}
 	if g.touchEnabled {
+		// Triple-touch screen switches mode
 		if len(pressedTouchIDs) > 2 {
-			g.displayMode = (g.displayMode + 1) % 2
-			err := persist.Store("displaymode", displayModeToName[g.displayMode])
-			if err != nil {
-				log("error storing display mode: %v", err)
-			}
+			switchMode()
 		}
 		for _, id := range pressedTouchIDs {
 			g.pressX, g.pressY = ebiten.TouchPosition(id)
