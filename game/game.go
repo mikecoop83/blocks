@@ -302,13 +302,14 @@ func (g *Game) drawPieceOptions(screen *ebiten.Image) {
 	const bottomAreaOffset = topAreaHeight + boardHeight
 	const pieceOptionCellSize = cellSize * 0.5
 	pieceOptionWidth := boardWidth / numPieceOptions
+	stateToColor := displayModeToCellColor[g.displayMode]
 	for p, piece := range g.pieceOptions {
 		if piece == nil {
 			continue
 		}
-		pieceOptionColor := cellStateToColor[lib.Unchosen]
+		pieceOptionColor := stateToColor[lib.Unchosen]
 		if p == g.chosenPieceIdx && g.releaseX >= 0 && g.releaseY >= 0 {
-			pieceOptionColor = cellStateToColor[lib.Pending]
+			pieceOptionColor = stateToColor[lib.Pending]
 		}
 		yOffset := (bottomAreaHeight - piece.Height()*pieceOptionCellSize) / 2
 		xOffset := (pieceOptionWidth - piece.Width()*pieceOptionCellSize) / 2
@@ -321,7 +322,7 @@ func (g *Game) drawPieceOptions(screen *ebiten.Image) {
 		pieceAreaY := bottomAreaOffset
 		if g.pressX >= pieceAreaX && g.pressX < pieceAreaX+pieceOptionWidth &&
 			g.pressY >= pieceAreaY && g.pressY < pieceAreaY+bottomAreaHeight {
-			pieceOptionColor = cellStateToColor[lib.Hovering]
+			pieceOptionColor = stateToColor[lib.Hovering]
 			g.chosenPieceIdx = p
 		}
 		for r := range piece.Shape {
@@ -390,6 +391,7 @@ func (g *Game) drawOverlay(screen *ebiten.Image) {
 
 func (g *Game) drawBoard(screen *ebiten.Image) {
 	grid := g.board.GetGrid()
+	stateToColor := displayModeToCellColor[g.displayMode]
 
 	// Either drag or click is the current mouse position.
 	mouseX, mouseY := g.dragX, g.dragY
@@ -442,15 +444,15 @@ func (g *Game) drawBoard(screen *ebiten.Image) {
 			}
 			for _, r := range clearedRows {
 				g.clearedRows[r] = &animatedEntity{
-					currentColor:  cellStateToColor[lib.FullLine],
-					targetColor:   cellStateToColor[lib.Empty],
+					currentColor:  stateToColor[lib.FullLine],
+					targetColor:   stateToColor[lib.Empty],
 					animationTime: 1 * time.Second,
 				}
 			}
 			for _, c := range clearedCols {
 				g.clearedCols[c] = &animatedEntity{
-					currentColor:  cellStateToColor[lib.FullLine],
-					targetColor:   cellStateToColor[lib.Empty],
+					currentColor:  stateToColor[lib.FullLine],
+					targetColor:   stateToColor[lib.Empty],
 					animationTime: 1 * time.Second,
 				}
 			}
