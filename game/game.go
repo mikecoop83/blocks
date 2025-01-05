@@ -491,25 +491,38 @@ func (g *Game) drawClearedRowsAndCols(screen *ebiten.Image) {
 		if entity == nil {
 			continue
 		}
-		vector.DrawFilledRect(
-			screen,
-			0, float32(topAreaHeight+r*cellSize),
-			boardWidth, cellSize,
-			entity.currentColor,
-			false,
-		)
+		for c := 0; c < lib.BoardSize; c++ {
+			// if the cell is pending, don't draw the animated color
+			if g.board.GetGrid()[r][c] == lib.Pending {
+				continue
+			}
+			vector.DrawFilledRect(
+				screen,
+				float32(c*cellSize), float32(topAreaHeight+r*cellSize),
+				cellSize, cellSize,
+				entity.currentColor,
+				false,
+			)
+		}
 	}
+
 	for c, entity := range g.clearedCols {
 		if entity == nil {
 			continue
 		}
-		vector.DrawFilledRect(
-			screen,
-			float32(c*cellSize), float32(topAreaHeight),
-			cellSize, boardHeight,
-			entity.currentColor,
-			false,
-		)
+		for r := 0; r < lib.BoardSize; r++ {
+			// if the cell is pending, don't draw the animated color
+			if g.board.GetGrid()[r][c] == lib.Pending {
+				continue
+			}
+			vector.DrawFilledRect(
+				screen,
+				float32(c*cellSize), float32(topAreaHeight+r*cellSize),
+				cellSize, cellSize,
+				entity.currentColor,
+				false,
+			)
+		}
 	}
 }
 
