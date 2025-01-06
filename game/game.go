@@ -288,8 +288,6 @@ func (g *Game) drawGame(screen *ebiten.Image) {
 
 	g.drawHeader(screen)
 
-	g.drawClearedRowsAndCols(screen)
-
 	g.drawBoard(screen)
 
 	g.drawOverlay(screen)
@@ -466,60 +464,23 @@ func (g *Game) drawBoard(screen *ebiten.Image) {
 	}
 	// Draw the cells
 	for r := range grid {
-		if g.clearedRows[r] != nil {
-			continue
-		}
 		for c := range grid[r] {
-			if g.clearedCols[c] != nil {
-				continue
-			}
 			state := grid[r][c]
 			displayColors := displayModeToCellColor[g.displayMode]
-			vector.DrawFilledRect(
-				screen,
-				float32(c*cellSize), float32(topAreaHeight+r*cellSize),
-				cellSize, cellSize,
-				displayColors[state],
-				false,
-			)
-		}
-	}
-}
-
-func (g *Game) drawClearedRowsAndCols(screen *ebiten.Image) {
-	for r, entity := range g.clearedRows {
-		if entity == nil {
-			continue
-		}
-		for c := 0; c < lib.BoardSize; c++ {
-			// if the cell is pending, don't draw the animated color
-			if g.board.GetGrid()[r][c] == lib.Pending {
-				continue
+			displayColor := displayColors[state]
+			if state == lib.Empty {
+				if g.clearedCols[c] != nil {
+					displayColor = g.clearedCols[c].currentColor
+				}
+				if g.clearedRows[r] != nil {
+					displayColor = g.clearedRows[r].currentColor
+				}
 			}
 			vector.DrawFilledRect(
 				screen,
 				float32(c*cellSize), float32(topAreaHeight+r*cellSize),
 				cellSize, cellSize,
-				entity.currentColor,
-				false,
-			)
-		}
-	}
-
-	for c, entity := range g.clearedCols {
-		if entity == nil {
-			continue
-		}
-		for r := 0; r < lib.BoardSize; r++ {
-			// if the cell is pending, don't draw the animated color
-			if g.board.GetGrid()[r][c] == lib.Pending {
-				continue
-			}
-			vector.DrawFilledRect(
-				screen,
-				float32(c*cellSize), float32(topAreaHeight+r*cellSize),
-				cellSize, cellSize,
-				entity.currentColor,
+				displayColor,
 				false,
 			)
 		}
