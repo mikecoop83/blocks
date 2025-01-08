@@ -28,7 +28,18 @@ var (
 	darkGray    = color.RGBA{R: 0x40, G: 0x40, B: 0x40, A: 0xff}
 	paleYellow  = color.RGBA{R: 0xff, G: 0xff, B: 0xcc, A: 0xff}
 	reddishGray = color.RGBA{R: 0x99, G: 0x66, B: 0x66, A: 0xff}
+
+	// some colors for pieces
+	lightBlue   = color.RGBA{R: 0x66, G: 0xcc, B: 0xff, A: 0xff}
+	lightOrange = color.RGBA{R: 0xff, G: 0xcc, B: 0x66, A: 0xff}
+	pink        = color.RGBA{R: 0xff, G: 0x66, B: 0xcc, A: 0xff}
 )
+
+var pieceColors = []color.Color{
+	lightBlue,
+	pink,
+	lightOrange,
+}
 
 const (
 	splashDuration   = 2 * time.Second
@@ -311,7 +322,7 @@ func (g *Game) drawPieceOptions(screen *ebiten.Image) {
 		if piece == nil {
 			continue
 		}
-		pieceOptionColor := stateToColor[lib.Unchosen]
+		pieceOptionColor := pieceColors[piece.PieceID%len(pieceColors)]
 		if p == g.chosenPieceIdx && g.releaseX >= 0 && g.releaseY >= 0 {
 			pieceOptionColor = stateToColor[lib.Pending]
 		}
@@ -474,6 +485,9 @@ func (g *Game) drawBoard(screen *ebiten.Image) {
 			cell := grid[r][c]
 			displayColors := displayModeToCellColor[g.displayMode]
 			displayColor := displayColors[cell.State]
+			if cell.State == lib.Occupied {
+				displayColor = pieceColors[cell.PieceID%len(pieceColors)]
+			}
 			if cell.State == lib.Empty {
 				if g.clearedCols[c] != nil {
 					displayColor = g.clearedCols[c].currentColor
