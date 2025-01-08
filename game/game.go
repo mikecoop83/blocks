@@ -99,7 +99,7 @@ var nameToDisplayMode = map[string]DisplayMode{
 type Game struct {
 	board *lib.Board
 
-	pieceOptions [numPieceOptions]*lib.Piece
+	pieceOptions [numPieceOptions]*lib.PieceInstance
 
 	clearedRows [lib.BoardSize]*animatedEntity
 	clearedCols [lib.BoardSize]*animatedEntity
@@ -123,7 +123,7 @@ type Game struct {
 func (g *Game) Reset() {
 	newBoard := lib.NewBoard()
 	g.board = &newBoard
-	g.pieceOptions = [numPieceOptions]*lib.Piece{}
+	g.pieceOptions = [numPieceOptions]*lib.PieceInstance{}
 	g.chosenPieceIdx = -1
 	g.score = 0
 	g.gameOver = false
@@ -142,9 +142,12 @@ func New() ebiten.Game {
 	return game
 }
 
-func (g *Game) chosenPiece() *lib.Piece {
+func (g *Game) chosenPiece() *lib.PieceInstance {
 	if g.cheating {
-		return &lib.AllPieces[0]
+		return &lib.PieceInstance{
+			Piece:   lib.AllPieces[0],
+			PieceID: lib.NextPieceID(),
+		}
 	}
 	if g.chosenPieceIdx < 0 || g.chosenPieceIdx >= len(g.pieceOptions) {
 		return nil
@@ -225,7 +228,10 @@ func (g *Game) Update() error {
 	if g.pieceOptions[0] == nil && g.pieceOptions[1] == nil && g.pieceOptions[2] == nil {
 		for i := 0; i < numPieceOptions; i++ {
 			randomPiece := lib.RandomRotatedPiece()
-			g.pieceOptions[i] = &randomPiece
+			g.pieceOptions[i] = &lib.PieceInstance{
+				Piece:   randomPiece,
+				PieceID: lib.NextPieceID(),
+			}
 		}
 	}
 	// Check if the game is over.
@@ -465,10 +471,10 @@ func (g *Game) drawBoard(screen *ebiten.Image) {
 	// Draw the cells
 	for r := range grid {
 		for c := range grid[r] {
-			state := grid[r][c]
+			cell := grid[r][c]
 			displayColors := displayModeToCellColor[g.displayMode]
-			displayColor := displayColors[state]
-			if state == lib.Empty {
+			displayColor := displayColors[cell.State]
+			if cell.State == lib.Empty {
 				if g.clearedCols[c] != nil {
 					displayColor = g.clearedCols[c].currentColor
 				}
