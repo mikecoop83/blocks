@@ -12,6 +12,9 @@ func Store(key string, value string) error {
 
 func Load(key string) (string, error) {
 	localStorage := js.Global().Get("localStorage")
-	val := localStorage.Call("getItem", key).String()
-	return val, nil
+	val := localStorage.Call("getItem", key)
+	if val.IsNull() {
+		return "", nil
+	}
+	return val.String(), nil
 }

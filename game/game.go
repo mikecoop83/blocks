@@ -2,6 +2,7 @@ package game
 
 import (
 	"image/color"
+	"log/slog"
 	"math/rand"
 	"time"
 
@@ -136,7 +137,7 @@ func (g *Game) Reset(gameID uint64) {
 	g.cheated = false
 	displayModeText, err := persist.Load("displaymode")
 	if err != nil {
-		log("error loading display mode: %v", err)
+		slog.Error("error loading display mode: %v", err)
 	}
 	g.displayMode = nameToDisplayMode[displayModeText]
 	g.gameID = gameID
@@ -168,7 +169,7 @@ func (g *Game) Update() error {
 		g.displayMode = (g.displayMode + 1) % 2
 		err := persist.Store("displaymode", displayModeToName[g.displayMode])
 		if err != nil {
-			log("error storing display mode: %v", err)
+			slog.Error("error storing display mode: %v", err)
 		}
 	}
 	if inpututil.IsKeyJustReleased(ebiten.KeyM) {
