@@ -2,6 +2,7 @@ package game
 
 import (
 	"image/color"
+	"math/rand"
 	"time"
 
 	"github.com/mikecoop83/blocks/persist"
@@ -99,6 +100,10 @@ var nameToDisplayMode = map[string]DisplayMode{
 type Game struct {
 	board *lib.Board
 
+	gameID       uint64
+	randSource   rand.Source
+	updateGameID func(gameID uint64)
+
 	pieceOptions [numPieceOptions]*lib.Piece
 
 	clearedRows [lib.BoardSize]*animatedEntity
@@ -120,7 +125,7 @@ type Game struct {
 	splashStart time.Time
 }
 
-func (g *Game) Reset() {
+func (g *Game) Reset(gameID uint64) {
 	newBoard := lib.NewBoard()
 	g.board = &newBoard
 	g.pieceOptions = [numPieceOptions]*lib.Piece{}
@@ -134,11 +139,16 @@ func (g *Game) Reset() {
 		log("error loading display mode: %v", err)
 	}
 	g.displayMode = nameToDisplayMode[displayModeText]
+	g.gameID = gameID
+	g.randSource = rand.NewSource(int64(g.gameID))
+	g.updateGameID(g.gameID)
 }
 
-func New() ebiten.Game {
-	game := &Game{}
-	game.Reset()
+func New(gameID uint64, updateGameID func(gameID uint64)) ebiten.Game {
+	game := &Game{
+		updateGameID: updateGameID,
+	}
+	game.Reset(gameID)
 	return game
 }
 
@@ -218,13 +228,13 @@ func (g *Game) Update() error {
 		}
 	}
 	if inpututil.IsKeyJustReleased(ebiten.KeyR) {
-		g.Reset()
+		g.Reset(rand.Uint64())
 	}
 
 	// If no pieces to choose, get numPieceOptions new pieces and set first piece to be chosen.
 	if g.pieceOptions[0] == nil && g.pieceOptions[1] == nil && g.pieceOptions[2] == nil {
 		for i := 0; i < numPieceOptions; i++ {
-			randomPiece := lib.RandomRotatedPiece()
+			randomPiece := lib.RandomRotatedPiece(g.randSource)
 			g.pieceOptions[i] = &randomPiece
 		}
 	}
@@ -554,9 +564,10 @@ func (g *Game) drawHeader(screen *ebiten.Image) {
 		op.GeoM.Translate(float64(restartImageX), restartImageY)
 		screen.DrawImage(resources.RestartImage, op)
 
+		// Clicked on the restart image
 		if g.releaseX >= restartImageX && g.releaseX <= restartImageX+int(restartImageWidth) &&
 			g.releaseY >= int(restartImageY) && g.releaseY <= int(restartImageY+restartImageHeight) {
-			g.Reset()
+			g.Reset(rand.Uint64())
 		}
 	}
 }

@@ -52,10 +52,10 @@ func parsePiece(pieceStr string) Piece {
 	}
 }
 
-func RandomRotatedPiece() Piece {
-	randPieceIdx := rand.Intn(len(AllPieces))
+func RandomRotatedPiece(randSource rand.Source) Piece {
+	randPieceIdx := randSource.Int63() % int64(len(AllPieces))
 	piece := AllPieces[randPieceIdx]
-	rotateTimes := rand.Intn(4)
+	rotateTimes := int(randSource.Int63() % 4)
 	for i := 0; i < rotateTimes; i++ {
 		piece = piece.Rotate()
 	}
