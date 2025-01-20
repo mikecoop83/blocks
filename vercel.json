@@ -60,7 +60,7 @@
     },
     {
       "src": "/blocks.wasm",
-      "dest": "/resources/blocks.wasm"
+      "dest": "/out/blocks.wasm"
     },
     {
       "src": "/(.*)",
