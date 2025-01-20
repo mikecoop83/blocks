@@ -2,6 +2,10 @@
   "version": 2,
   "builds": [
     {
+      "src": "leaderboard/**/*.go",
+      "use": "@vercel/go"
+    },
+    {
       "src": "resources/index.html",
       "use": "@vercel/static"
     },
