@@ -14,7 +14,7 @@ type LeaderboardEntry struct {
 
 var leaderboard = make(map[uint64]int)
 
-func addScoreHandler(w http.ResponseWriter, r *http.Request) {
+func Handler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
@@ -43,7 +43,7 @@ func addScoreHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	http.HandleFunc("/add_score", addScoreHandler)
+	http.HandleFunc("/add_score", Handler)
 	slog.Info("Starting server on :8080")
 	err := http.ListenAndServe(":8080", nil)
 	if err != nil {
