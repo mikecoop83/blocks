@@ -18,9 +18,6 @@ mkdir -p OUTPUT_DIR
 echo "Building WebAssembly (WASM)..."
 GOOS=js GOARCH=wasm go build -o $OUTPUT_DIR/blocks.wasm
 
-echo "Building Go handler..."
-go build -o $OUTPUT_DIR/handler
-
 echo "Copying static files..."
 cp -r static/* $OUTPUT_DIR
 
