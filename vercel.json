@@ -27,12 +27,12 @@
       "dest": "/blocks.wasm"
     },
     {
-      "src": "/.*",
-      "status": 404
-    },
-    {
       "src": "/add_score",
       "dest": "/leaderboard/server.go"
+    },
+    {
+      "src": "/.*",
+      "status": 404
     }
   ]
 }
