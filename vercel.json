@@ -18,7 +18,7 @@
       "use": "@vercel/static"
     },
     {
-      "src": "resources/*.wasm",
+      "src": "out/*.wasm",
       "use": "@vercel/static"
     },
     {
