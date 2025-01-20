@@ -33,7 +33,7 @@ var (
 )
 
 const (
-	splashDuration   = 1.25 * time.Second
+	splashDuration   = time.Second
 	cellSize         = 100
 	topAreaHeight    = 100
 	numPieceOptions  = 3
