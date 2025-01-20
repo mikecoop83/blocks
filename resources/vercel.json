@@ -1,0 +1,35 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "leaderboard/server.go",
+      "use": "@vercel/go"
+    },
+    {
+      "src": "resources/index.html",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "out/*.png",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "out/*.js",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "out/*.wasm",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/add_score",
+      "dest": "/server.go"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/resources/index.html"
+    }
+  ]
+}
