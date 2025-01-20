@@ -20,6 +20,13 @@
     {
       "src": "out/*.wasm",
       "use": "@vercel/static"
+    },
+    {
+      "src": "src/main.go",
+      "use": "@vercel/go",
+      "config": {
+        "buildCommand": "GOOS=js GOARCH=wasm go build -o out/blocks.wasm"
+      }
     }
   ],
   "routes": [
