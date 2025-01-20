@@ -8,6 +8,10 @@ import (
 	"strconv"
 )
 
+func setup() {
+
+}
+
 func getGameIDFromParams() (uint64, error) {
 	if len(os.Args) < 2 {
 		return 0, nil

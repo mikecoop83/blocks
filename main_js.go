@@ -4,11 +4,25 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/url"
 	"strconv"
 	"syscall/js"
 )
+
+func setup() {
+	js.Global().Set("wasmCallback", js.FuncOf(handleToken))
+}
+
+func handleToken(this js.Value, args []js.Value) interface{} {
+	if len(args) > 0 {
+		token := args[0].String()
+		fmt.Println("Received Google ID Token:", token)
+		// Use the token to authenticate the player in your backend or game logic
+	}
+	return nil
+}
 
 func getGameIDFromParams() (uint64, error) {
 	query := js.Global().Get("window").Get("location").Get("search").String()

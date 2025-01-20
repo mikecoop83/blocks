@@ -1,10 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"log/slog"
 	"math/rand"
-	"syscall/js"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/mikecoop83/blocks/game"
@@ -25,19 +23,11 @@ func main() {
 		gameID = rand.Uint64()
 	}
 
-	js.Global().Set("wasmCallback", js.FuncOf(handleToken))
+	setup()
 
 	// Run the game.
 	err = ebiten.RunGame(game.New(gameID, updateGameID))
 	if err != nil {
 		panic(err)
 	}
-}
-func handleToken(this js.Value, args []js.Value) interface{} {
-	if len(args) > 0 {
-		token := args[0].String()
-		fmt.Println("Received Google ID Token:", token)
-		// Use the token to authenticate the player in your backend or game logic
-	}
-	return nil
 }
