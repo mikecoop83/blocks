@@ -25,7 +25,7 @@
       "src": "src/main.go",
       "use": "@vercel/go",
       "config": {
-        "buildCommand": "GOOS=js GOARCH=wasm go build -x -o out/blocks.wasm"
+        "buildCommand": "GOOS=js GOARCH=wasm go build -x -o out/blocks.wasm ./src"
       }
     }
   ],
