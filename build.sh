@@ -9,10 +9,8 @@ if ! [ -x "$(command -v go)" ]; then
   export PATH=$PATH:$(pwd)/go/bin
 fi
 
-mkdir -p out/
-rm -f out/*
+mkdir -p dist/out/
+rm -f dist/out/*
 echo "Building blocks.wasm..."
-env GOOS=js GOARCH=wasm go build -o out/blocks.wasm
+env GOOS=js GOARCH=wasm go build -o dist/out/blocks.wasm
 echo "Done!"
-pwd
-ls -l out/
