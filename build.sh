@@ -13,7 +13,7 @@ fi
 OUTPUT_DIR="dist"
 
 # Create directories if they don't exist
-mkdir -p OUTPUT_DIR
+mkdir -p $OUTPUT_DIR
 
 echo "Building WebAssembly (WASM)..."
 GOOS=js GOARCH=wasm go build -o $OUTPUT_DIR/blocks.wasm

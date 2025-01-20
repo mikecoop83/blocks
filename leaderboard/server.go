@@ -15,6 +15,14 @@ type LeaderboardEntry struct {
 var leaderboard = make(map[uint64]int)
 
 func Handler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		// write hello world
+		_, err := w.Write([]byte("Hello, World!"))
+		if err != nil {
+			http.Error(w, "Failed to write response", http.StatusInternalServerError)
+		}
+		return
+	}
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return

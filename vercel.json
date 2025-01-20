@@ -7,6 +7,10 @@
       "config": {
         "distDir": "dist"
       }
+    },
+    {
+      "src": "leaderboard/server.go",
+      "use": "@vercel/go"
     }
   ],
   "routes": [
@@ -25,6 +29,10 @@
     {
       "src": "/.*",
       "status": 404
+    },
+    {
+      "src": "/add_score",
+      "dest": "/leaderboard/server.go"
     }
   ]
 }
