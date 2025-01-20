@@ -35,6 +35,34 @@
       "dest": "/server.go"
     },
     {
+      "src": "/index.html",
+      "dest": "/resources/index.html"
+    },
+    {
+      "src": "/logo.png",
+      "dest": "/resources/logo.png"
+    },
+    {
+      "src": "/restart.png",
+      "dest": "/resources/logo.png"
+    },
+    {
+      "src": "/logo.png",
+      "dest": "/resources/logo.png"
+    },
+    {
+      "src": "/1stplace.png",
+      "dest": "/resources/logo.png"
+    },
+    {
+      "src": "/wasm_exec.js",
+      "dest": "/resources/wasm_exec.js"
+    },
+    {
+      "src": "/blocks.wasm",
+      "dest": "/resources/blocks.wasm"
+    },
+    {
       "src": "/(.*)",
       "dest": "/resources/index.html"
     }
