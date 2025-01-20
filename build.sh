@@ -11,4 +11,7 @@ fi
 
 mkdir -p out/
 rm -f out/*
+echo "Building blocks.wasm..."
 env GOOS=js GOARCH=wasm go build -o out/blocks.wasm
+echo "Done!"
+ls -l out/
