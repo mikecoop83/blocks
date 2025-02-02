@@ -23,8 +23,6 @@ fi
 rm -f logo-*.png
 
 # Generate all required sizes
-$CMD logo.png -resize 16x16 logo-16.png
-$CMD logo.png -resize 32x32 logo-32.png
 $CMD logo.png -resize 152x152 logo-152.png
 $CMD logo.png -resize 167x167 logo-167.png
 $CMD logo.png -resize 180x180 logo-180.png
