@@ -25,3 +25,13 @@ go.work.sum
 
 # IDE
 .idea/
+
+# Generated icons
+resources/logo-16.png
+resources/logo-32.png
+resources/logo-152.png
+resources/logo-167.png
+resources/logo-180.png
+resources/logo-192.png
+resources/logo-512.png
+.DS_Store
