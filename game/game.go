@@ -42,6 +42,15 @@ const (
 	bottomAreaHeight = lib.BoardSize * cellSize * 0.5
 	WindowWidth      = boardWidth
 	WindowHeight     = topAreaHeight + boardHeight + bottomAreaHeight
+
+	// Menu constants
+	menuButtonSize = topAreaHeight * 0.4
+	menuItemHeight = 100
+	menuWidth      = 350
+	menuPadding    = 35
+
+	// Flash message constants
+	flashDuration = 500 * time.Millisecond
 )
 
 var displayModeToCellColor = map[DisplayMode]map[lib.CellState]color.Color{
@@ -124,6 +133,13 @@ type Game struct {
 	displayMode DisplayMode
 
 	splashStart time.Time
+
+	// Menu state
+	menuOpen bool
+
+	// Flash message state
+	flashMessage     string
+	flashMessageTime time.Time
 }
 
 func (g *Game) Reset(gameID uint64) {
@@ -135,6 +151,8 @@ func (g *Game) Reset(gameID uint64) {
 	g.gameOver = false
 	g.highScore = maybeGetHighScore()
 	g.cheated = false
+	g.menuOpen = false
+	g.flashMessage = ""
 	displayModeText, err := persist.Load("displaymode")
 	if err != nil {
 		slog.Error("error loading display mode: %v", err)
@@ -226,6 +244,9 @@ func (g *Game) Update() error {
 			g.releaseX, g.releaseY = ebiten.CursorPosition()
 			g.dragX, g.dragY = -1, -1
 			g.pressX, g.pressY = -1, -1
+		} else if !ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
+			// Reset press coordinates when not clicking
+			g.pressX, g.pressY = -1, -1
 		}
 	}
 	if inpututil.IsKeyJustReleased(ebiten.KeyR) {
@@ -297,13 +318,13 @@ func (g *Game) drawGame(screen *ebiten.Image) {
 		g.releaseX, g.releaseY = -1, -1
 	}()
 
-	g.drawHeader(screen)
-
 	g.drawBoard(screen)
 
 	g.drawOverlay(screen)
 
 	g.drawPieceOptions(screen)
+
+	g.drawHeader(screen)
 }
 
 func (g *Game) drawPieceOptions(screen *ebiten.Image) {
@@ -534,9 +555,159 @@ func (g *Game) drawHeader(screen *ebiten.Image) {
 		scoreMsg,
 		resources.TextFontFace,
 		// Offset it from the right edge a bit
-		int(boardWidth-scoreWidth-20), int(((topAreaHeight-scoreHeight)/2)+scoreHeight),
+		int(boardWidth-scoreWidth-80), int(((topAreaHeight-scoreHeight)/2)+scoreHeight),
 		displayModeToForegroundColor[g.displayMode],
 	)
+
+	// Draw flash message if active
+	if g.flashMessage != "" && time.Since(g.flashMessageTime) < flashDuration {
+		flashMsg := g.flashMessage
+		flashWidth, flashHeight := getTextSize(flashMsg, resources.TextFontFace)
+		text.Draw(
+			screen,
+			flashMsg,
+			resources.TextFontFace,
+			int((boardWidth-flashWidth)/2),
+			int(((topAreaHeight-flashHeight)/2)+flashHeight),
+			green,
+		)
+	} else {
+		g.flashMessage = ""
+	}
+
+	// Draw menu button (three dots)
+	dotSize := menuButtonSize / 4
+	dotSpacing := menuButtonSize / 3
+	dotColor := displayModeToForegroundColor[g.displayMode]
+	menuButtonHeight := dotSize*3 + dotSpacing*2
+	menuButtonWidth := dotSize
+	menuX := float64(boardWidth - int(menuButtonWidth) - 50)
+	menuY := float64((topAreaHeight - int(menuButtonHeight)) / 2)
+
+	// Check if menu button is clicked
+	if float64(g.releaseX) >= menuX && float64(g.releaseX) <= menuX+menuButtonSize &&
+		float64(g.releaseY) >= menuY && float64(g.releaseY) <= menuY+menuButtonSize {
+		g.menuOpen = !g.menuOpen
+		g.releaseX, g.releaseY = -1, -1
+	}
+
+	// Draw the three dots vertically
+	for i := 0; i < 3; i++ {
+		dotY := menuY + dotSpacing + float64(i)*dotSpacing
+		vector.DrawFilledCircle(screen,
+			float32(menuX+menuButtonSize/2),
+			float32(dotY),
+			float32(dotSize/2),
+			dotColor,
+			false)
+	}
+
+	// Draw menu if open
+	if g.menuOpen {
+		menuItems := []string{"Copy game link", "Retry game", "New game"}
+		menuX = float64(boardWidth - int(menuWidth) - 10)
+		menuY = float64(topAreaHeight + 5)
+
+		// Draw menu background with transparency
+		bgColor := displayModeToBackgroundColor[g.displayMode]
+		if g.displayMode == DisplayModeDark {
+			bgColor = color.RGBA{R: 0x30, G: 0x30, B: 0x30, A: 0xff}
+		}
+
+		// Draw menu shadow
+		shadowOffset := float32(2)
+		shadowColor := color.RGBA{0, 0, 0, 40}
+		vector.DrawFilledRect(
+			screen,
+			float32(menuX)+shadowOffset,
+			float32(menuY)+shadowOffset,
+			float32(menuWidth),
+			float32(len(menuItems)*menuItemHeight),
+			shadowColor,
+			false,
+		)
+
+		vector.DrawFilledRect(
+			screen,
+			float32(menuX),
+			float32(menuY),
+			float32(menuWidth),
+			float32(len(menuItems)*menuItemHeight),
+			bgColor,
+			false,
+		)
+
+		// Draw menu border with transparency
+		borderColor := color.RGBA{0x80, 0x80, 0x80, 0x40}
+		vector.StrokeRect(
+			screen,
+			float32(menuX),
+			float32(menuY),
+			float32(menuWidth),
+			float32(len(menuItems)*menuItemHeight),
+			1,
+			borderColor,
+			false,
+		)
+
+		// Draw menu items with smaller font
+		for i, item := range menuItems {
+			itemY := menuY + float64(i*menuItemHeight)
+			_, textHeight := getTextSize(item, resources.SmallTextFontFace)
+
+			// Center text vertically in menu item
+			textY := itemY + (float64(menuItemHeight)-float64(textHeight))/2 + float64(textHeight)
+
+			// Draw menu item text
+			text.Draw(
+				screen,
+				item,
+				resources.SmallTextFontFace,
+				int(menuX)+menuPadding,
+				int(textY),
+				displayModeToForegroundColor[g.displayMode],
+			)
+
+			// Draw separator line with transparency
+			if i < len(menuItems)-1 {
+				vector.StrokeLine(
+					screen,
+					float32(menuX)+4,
+					float32(itemY+float64(menuItemHeight)),
+					float32(menuX+menuWidth)-4,
+					float32(itemY+float64(menuItemHeight)),
+					1,
+					borderColor,
+					false,
+				)
+			}
+		}
+
+		// Handle menu item click
+		if float64(g.releaseX) >= menuX && float64(g.releaseX) <= menuX+menuWidth {
+			itemIdx := (float64(g.releaseY) - menuY) / float64(menuItemHeight)
+			if itemIdx >= 0 && itemIdx < float64(len(menuItems)) {
+				switch int(itemIdx) {
+				case 0: // Copy game link
+					copyToClipboard(getGameURL())
+					g.flashMessage = "Copied!"
+					g.flashMessageTime = time.Now()
+				case 1: // Retry same game
+					g.Reset(g.gameID)
+				case 2: // New game
+					g.Reset(rand.Uint64())
+				}
+				g.menuOpen = false
+				g.releaseX, g.releaseY = -1, -1
+			}
+		}
+
+		// Close menu if clicked outside
+		if g.releaseX >= 0 && g.releaseY >= 0 {
+			g.menuOpen = false
+			g.releaseX, g.releaseY = -1, -1
+		}
+	}
 
 	// Game over in the middle
 	if g.gameOver {
