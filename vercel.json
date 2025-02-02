@@ -27,7 +27,7 @@
       "dest": "/blocks.wasm"
     },
     {
-      "src": "/add_score",
+      "src": "/leaderboard",
       "dest": "/leaderboard/server.go"
     },
     {

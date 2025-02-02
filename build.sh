@@ -20,5 +20,6 @@ GOOS=js GOARCH=wasm go build -o $OUTPUT_DIR/blocks.wasm
 
 echo "Copying static files..."
 cp -r static/* $OUTPUT_DIR
+cp resources/logo.png $OUTPUT_DIR
 
 echo "Build completed successfully!"
