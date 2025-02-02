@@ -1,16 +1,81 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
     <title>Blocks</title>
-    <link rel="icon" href="logo.png" type="image/png">
+
+    <!-- PWA meta tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta name="apple-mobile-web-app-title" content="Blocks" />
+    <meta name="theme-color" content="#ffffff" />
+
+    <!-- iOS icons -->
+    <link rel="apple-touch-icon" href="logo-192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="logo-180.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="logo-152.png" />
+    <link rel="apple-touch-icon" sizes="167x167" href="logo-167.png" />
+    <link rel="apple-touch-startup-image" href="logo-512.png" />
+
+    <!-- PWA manifest -->
+    <link rel="manifest" href="manifest.json" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="32x32" href="logo-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="logo-16.png" />
+    <link rel="icon" href="logo.png" type="image/png" />
+
+    <!-- Prevent touch zooming -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        position: fixed;
+      }
+      /* Disable text selection */
+      * {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+    </style>
+
     <script src="wasm_exec.js"></script>
     <script>
-        const go = new Go();
-        WebAssembly.instantiateStreaming(fetch("blocks.wasm"), go.importObject).then(result => {
-            go.run(result.instance);
+      // Register service worker
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker
+            .register("/sw.js")
+            .then((registration) =>
+              console.log("ServiceWorker registration successful")
+            )
+            .catch((err) =>
+              console.log("ServiceWorker registration failed: ", err)
+            );
         });
+      }
+
+      // Load WASM
+      const go = new Go();
+      WebAssembly.instantiateStreaming(
+        fetch("blocks.wasm"),
+        go.importObject
+      ).then((result) => {
+        go.run(result.instance);
+      });
     </script>
-</head>
+  </head>
+  <body></body>
 </html>
