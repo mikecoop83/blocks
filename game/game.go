@@ -76,6 +76,7 @@ var cellStateToColor = map[lib.CellState]color.Color{
 	lib.Occupied: blue,
 	lib.Unchosen: gray,
 	lib.Hovering: paleYellow,
+	lib.CantMove: reddishGray,
 }
 
 var darkCellStateToColor = map[lib.CellState]color.Color{
@@ -86,6 +87,7 @@ var darkCellStateToColor = map[lib.CellState]color.Color{
 	lib.Occupied: blue,
 	lib.Unchosen: gray,
 	lib.Hovering: paleYellow,
+	lib.CantMove: reddishGray,
 }
 var commaFormatter = message.NewPrinter(language.English)
 
@@ -114,7 +116,8 @@ type Game struct {
 	randSource   rand.Source
 	updateGameID func(gameID uint64)
 
-	pieceOptions [numPieceOptions]*lib.Piece
+	pieceOptions       [numPieceOptions]*lib.Piece
+	pieceOptionCanMove [numPieceOptions]bool
 
 	clearedRows [lib.BoardSize]*animatedEntity
 	clearedCols [lib.BoardSize]*animatedEntity
@@ -261,12 +264,14 @@ func (g *Game) Update() error {
 		}
 	}
 	// Check if the game is over.
-	var hasValidMove bool
-outer:
-	for _, piece := range g.pieceOptions {
+	var hasValidMove [numPieceOptions]bool
+	var hasAnyValidMove bool
+	for p, piece := range g.pieceOptions {
+		g.pieceOptionCanMove[p] = false
 		if piece == nil {
 			continue
 		}
+	outer:
 		for r := range lib.BoardSize {
 			for c := range lib.BoardSize {
 				pieceLoc := lib.PieceLocation{
@@ -274,13 +279,15 @@ outer:
 					Loc:   lib.Location{C: c, R: r},
 				}
 				if g.board.ValidatePiece(pieceLoc, false) {
-					hasValidMove = true
+					hasValidMove[p] = true
+					hasAnyValidMove = true
 					break outer
 				}
 			}
 		}
 	}
-	if !hasValidMove {
+	g.pieceOptionCanMove = hasValidMove
+	if !hasAnyValidMove {
 		g.gameOver = true
 	}
 
@@ -340,6 +347,9 @@ func (g *Game) drawPieceOptions(screen *ebiten.Image) {
 		pieceOptionColor := stateToColor[lib.Unchosen]
 		if p == g.chosenPieceIdx && g.releaseX >= 0 && g.releaseY >= 0 {
 			pieceOptionColor = stateToColor[lib.Pending]
+		}
+		if !g.pieceOptionCanMove[p] {
+			pieceOptionColor = stateToColor[lib.CantMove]
 		}
 		yOffset := (bottomAreaHeight - piece.Height()*pieceOptionCellSize) / 2
 		xOffset := (pieceOptionWidth - piece.Width()*pieceOptionCellSize) / 2
@@ -594,12 +604,14 @@ func (g *Game) drawHeader(screen *ebiten.Image) {
 	// Draw the three dots vertically
 	for i := 0; i < 3; i++ {
 		dotY := menuY + dotSpacing + float64(i)*dotSpacing
-		vector.DrawFilledCircle(screen,
+		vector.DrawFilledCircle(
+			screen,
 			float32(menuX+menuButtonSize/2),
 			float32(dotY),
 			float32(dotSize/2),
 			dotColor,
-			false)
+			false,
+		)
 	}
 
 	// Draw menu if open

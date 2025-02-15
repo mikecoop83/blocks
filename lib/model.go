@@ -14,6 +14,7 @@ const (
 	Occupied
 	Unchosen
 	Hovering
+	CantMove
 )
 
 const BoardSize = 8
