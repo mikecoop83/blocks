@@ -76,7 +76,7 @@ var cellStateToColor = map[lib.CellState]color.Color{
 	lib.Occupied: blue,
 	lib.Unchosen: gray,
 	lib.Hovering: paleYellow,
-	lib.CantMove: reddishGray,
+	lib.CantMove: red,
 }
 
 var darkCellStateToColor = map[lib.CellState]color.Color{
@@ -87,7 +87,7 @@ var darkCellStateToColor = map[lib.CellState]color.Color{
 	lib.Occupied: blue,
 	lib.Unchosen: gray,
 	lib.Hovering: paleYellow,
-	lib.CantMove: reddishGray,
+	lib.CantMove: red,
 }
 var commaFormatter = message.NewPrinter(language.English)
 
