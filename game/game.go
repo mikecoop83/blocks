@@ -157,6 +157,7 @@ type Game struct {
 	corruptionLevel      int // Number of corrupted cells
 	corruptionStartTime  time.Time
 	lastCorruptionSpread time.Time
+	corruptionGameOver   bool // True if game over was caused by corruption
 }
 
 func (g *Game) Reset(gameID uint64) {
@@ -189,6 +190,7 @@ func (g *Game) Reset(gameID uint64) {
 	g.corruptionLevel = 0
 	g.corruptionStartTime = time.Now()
 	g.lastCorruptionSpread = time.Now()
+	g.corruptionGameOver = false
 }
 
 func New(gameID uint64, updateGameID func(gameID uint64)) ebiten.Game {
@@ -421,20 +423,31 @@ func (g *Game) Update() error {
 			// Check if corruption has taken over (more than half the board)
 			if g.corruptionLevel > (lib.BoardSize*lib.BoardSize)/2 {
 				g.gameOver = true
+				g.corruptionGameOver = true
 			}
 		}
 
 		// Random screen flicker - more likely as corruption grows
-		if g.corruptionLevel > 1 && g.flickerUntil.Before(time.Now()) {
-			// Chance increases with corruption (0.1% base + 0.05% per corruption cell)
-			flickerChance := int64(1000 - g.corruptionLevel*5)
-			if flickerChance < 100 {
-				flickerChance = 100
-			}
-			if g.randSource.Int63()%flickerChance == 0 {
-				// Flicker for 50-150ms
-				flickerDuration := time.Duration(50+g.randSource.Int63()%100) * time.Millisecond
-				g.flickerUntil = time.Now().Add(flickerDuration)
+		if g.flickerUntil.Before(time.Now()) {
+			// If game over from corruption, flicker uncontrollably
+			if g.corruptionGameOver {
+				// Flicker almost constantly (95% chance each frame)
+				if g.randSource.Int63()%20 < 19 {
+					// Very short duration for rapid flickering effect
+					flickerDuration := time.Duration(30+g.randSource.Int63()%50) * time.Millisecond
+					g.flickerUntil = time.Now().Add(flickerDuration)
+				}
+			} else if g.corruptionLevel > 1 {
+				// Normal flicker - chance increases with corruption (0.2% base + 0.1% per corruption cell)
+				flickerChance := int64(500 - g.corruptionLevel*5)
+				if flickerChance < 50 {
+					flickerChance = 50
+				}
+				if g.randSource.Int63()%flickerChance == 0 {
+					// Flicker for 100-300ms
+					flickerDuration := time.Duration(100+g.randSource.Int63()%200) * time.Millisecond
+					g.flickerUntil = time.Now().Add(flickerDuration)
+				}
 			}
 		}
 	}
