@@ -10,7 +10,7 @@ import (
 func maybeGetHighScore() int64 {
 	highScoreStr, err := persist.Load("highscore")
 	if err != nil {
-		slog.Error("failed to load high score: %v", err)
+		slog.Error("failed to load high score", err)
 		return 0
 	}
 	if highScoreStr == "" {
@@ -18,7 +18,7 @@ func maybeGetHighScore() int64 {
 	}
 	highScore, err := strconv.ParseInt(highScoreStr, 10, 64)
 	if err != nil {
-		slog.Error("failed to parse high score: %v", err)
+		slog.Error("failed to parse high score", err)
 		return 0
 	}
 	return highScore

@@ -12,6 +12,7 @@ import (
 var textFontData []byte
 var TextFontFace font.Face
 var SmallTextFontFace font.Face
+var MenuFontFace font.Face
 
 func init() {
 	var err error
@@ -32,6 +33,16 @@ func init() {
 	SmallTextFontFace, err = opentype.NewFace(
 		ttf, &opentype.FaceOptions{
 			Size: 42,
+			DPI:  72,
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	MenuFontFace, err = opentype.NewFace(
+		ttf, &opentype.FaceOptions{
+			Size: 28,
 			DPI:  72,
 		},
 	)

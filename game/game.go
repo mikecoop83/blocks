@@ -44,10 +44,11 @@ const (
 	WindowHeight     = topAreaHeight + boardHeight + bottomAreaHeight
 
 	// Menu constants
-	menuButtonSize = topAreaHeight * 0.4
-	menuItemHeight = 100
-	menuWidth      = 350
-	menuPadding    = 35
+	menuButtonSize   = topAreaHeight * 0.4
+	menuItemHeight   = 60
+	menuWidth        = 250
+	menuPadding      = 20
+	menuCornerRadius = 12
 
 	// Flash message constants
 	flashDuration = 500 * time.Millisecond
@@ -158,7 +159,7 @@ func (g *Game) Reset(gameID uint64) {
 	g.flashMessage = ""
 	displayModeText, err := persist.Load("displaymode")
 	if err != nil {
-		slog.Error("error loading display mode: %v", err)
+		slog.Error("error loading display mode", err)
 	}
 	g.displayMode = nameToDisplayMode[displayModeText]
 	g.gameID = gameID
@@ -586,27 +587,52 @@ func (g *Game) drawHeader(screen *ebiten.Image) {
 	}
 
 	// Draw menu button (three dots)
-	dotSize := menuButtonSize / 4
-	dotSpacing := menuButtonSize / 3
+	dotSize := menuButtonSize / 5
+	dotSpacing := menuButtonSize / 3.5
 	dotColor := displayModeToForegroundColor[g.displayMode]
-	menuButtonHeight := dotSize*3 + dotSpacing*2
-	menuButtonWidth := dotSize
-	menuX := float64(boardWidth - int(menuButtonWidth) - 50)
-	menuY := float64((topAreaHeight - int(menuButtonHeight)) / 2)
+	menuButtonWidth := menuButtonSize
+	menuButtonHeight := menuButtonSize
+	menuButtonX := float64(boardWidth - int(menuButtonWidth) - 30)
+	menuButtonY := float64((topAreaHeight - int(menuButtonHeight)) / 2)
+
+	// Check if hovering over menu button
+	mouseX, mouseY := g.dragX, g.dragY
+	if mouseX < 0 {
+		mouseX, mouseY = ebiten.CursorPosition()
+	}
+	menuButtonHovered := float64(mouseX) >= menuButtonX && float64(mouseX) <= menuButtonX+menuButtonWidth &&
+		float64(mouseY) >= menuButtonY && float64(mouseY) <= menuButtonY+menuButtonHeight
+
+	// Draw hover background for menu button
+	if menuButtonHovered || g.menuOpen {
+		hoverColor := color.RGBA{R: 0x00, G: 0x00, B: 0x00, A: 0x15}
+		if g.displayMode == DisplayModeDark {
+			hoverColor = color.RGBA{R: 0xff, G: 0xff, B: 0xff, A: 0x15}
+		}
+		vector.DrawFilledCircle(
+			screen,
+			float32(menuButtonX+menuButtonWidth/2),
+			float32(menuButtonY+menuButtonHeight/2),
+			float32(menuButtonWidth/2),
+			hoverColor,
+			false,
+		)
+	}
 
 	// Check if menu button is clicked
-	if float64(g.releaseX) >= menuX && float64(g.releaseX) <= menuX+menuButtonSize &&
-		float64(g.releaseY) >= menuY && float64(g.releaseY) <= menuY+menuButtonSize {
+	if float64(g.releaseX) >= menuButtonX && float64(g.releaseX) <= menuButtonX+menuButtonSize &&
+		float64(g.releaseY) >= menuButtonY && float64(g.releaseY) <= menuButtonY+menuButtonSize {
 		g.menuOpen = !g.menuOpen
 		g.releaseX, g.releaseY = -1, -1
 	}
 
 	// Draw the three dots vertically
+	dotsStartY := menuButtonY + (menuButtonHeight-dotSpacing*2-dotSize*3)/2 + dotSize/2
 	for i := 0; i < 3; i++ {
-		dotY := menuY + dotSpacing + float64(i)*dotSpacing
+		dotY := dotsStartY + float64(i)*(dotSpacing+dotSize)
 		vector.DrawFilledCircle(
 			screen,
-			float32(menuX+menuButtonSize/2),
+			float32(menuButtonX+menuButtonWidth/2),
 			float32(dotY),
 			float32(dotSize/2),
 			dotColor,
@@ -617,87 +643,85 @@ func (g *Game) drawHeader(screen *ebiten.Image) {
 	// Draw menu if open
 	if g.menuOpen {
 		menuItems := []string{"Copy game link", "Retry game", "New game"}
-		menuX = float64(boardWidth - int(menuWidth) - 10)
-		menuY = float64(topAreaHeight + 5)
+		menuX := float32(boardWidth - int(menuWidth) - 16)
+		menuY := float32(topAreaHeight + 8)
+		menuHeight := float32(len(menuItems) * menuItemHeight)
 
-		// Draw menu background with transparency
-		bgColor := displayModeToBackgroundColor[g.displayMode]
+		// Draw menu background
+		bgColor := color.RGBA{R: 0xfa, G: 0xfa, B: 0xfa, A: 0xff}
 		if g.displayMode == DisplayModeDark {
-			bgColor = color.RGBA{R: 0x30, G: 0x30, B: 0x30, A: 0xff}
+			bgColor = color.RGBA{R: 0x2a, G: 0x2a, B: 0x2a, A: 0xff}
+		}
+		drawRoundedRect(
+			screen,
+			menuX,
+			menuY,
+			float32(menuWidth),
+			menuHeight,
+			menuCornerRadius,
+			bgColor,
+		)
+
+		// Determine which item is being hovered
+		hoveredItemIdx := -1
+		if float64(mouseX) >= float64(menuX) && float64(mouseX) <= float64(menuX)+menuWidth {
+			idx := (float64(mouseY) - float64(menuY)) / float64(menuItemHeight)
+			if idx >= 0 && idx < float64(len(menuItems)) {
+				hoveredItemIdx = int(idx)
+			}
 		}
 
-		// Draw menu shadow
-		shadowOffset := float32(2)
-		shadowColor := color.RGBA{0, 0, 0, 40}
-		vector.DrawFilledRect(
-			screen,
-			float32(menuX)+shadowOffset,
-			float32(menuY)+shadowOffset,
-			float32(menuWidth),
-			float32(len(menuItems)*menuItemHeight),
-			shadowColor,
-			false,
-		)
-
-		vector.DrawFilledRect(
-			screen,
-			float32(menuX),
-			float32(menuY),
-			float32(menuWidth),
-			float32(len(menuItems)*menuItemHeight),
-			bgColor,
-			false,
-		)
-
-		// Draw menu border with transparency
-		borderColor := color.RGBA{0x80, 0x80, 0x80, 0x40}
-		vector.StrokeRect(
-			screen,
-			float32(menuX),
-			float32(menuY),
-			float32(menuWidth),
-			float32(len(menuItems)*menuItemHeight),
-			1,
-			borderColor,
-			false,
-		)
-
-		// Draw menu items with smaller font
+		// Draw menu items
 		for i, item := range menuItems {
-			itemY := menuY + float64(i*menuItemHeight)
-			_, textHeight := getTextSize(item, resources.SmallTextFontFace)
+			itemY := float64(menuY) + float64(i*menuItemHeight)
+
+			// Draw hover highlight
+			if i == hoveredItemIdx {
+				hoverBgColor := color.RGBA{R: 0x00, G: 0x00, B: 0x00, A: 0x0a}
+				if g.displayMode == DisplayModeDark {
+					hoverBgColor = color.RGBA{R: 0xff, G: 0xff, B: 0xff, A: 0x0a}
+				}
+				vector.DrawFilledRect(screen, menuX, float32(itemY), float32(menuWidth), float32(menuItemHeight), hoverBgColor, false)
+			}
+
+			_, textHeight := getTextSize(item, resources.MenuFontFace)
 
 			// Center text vertically in menu item
 			textY := itemY + (float64(menuItemHeight)-float64(textHeight))/2 + float64(textHeight)
 
 			// Draw menu item text
+			textColor := displayModeToForegroundColor[g.displayMode]
 			text.Draw(
 				screen,
 				item,
-				resources.SmallTextFontFace,
+				resources.MenuFontFace,
 				int(menuX)+menuPadding,
 				int(textY),
-				displayModeToForegroundColor[g.displayMode],
+				textColor,
 			)
 
-			// Draw separator line with transparency
+			// Draw subtle separator line
 			if i < len(menuItems)-1 {
+				separatorColor := color.RGBA{R: 0x00, G: 0x00, B: 0x00, A: 0x10}
+				if g.displayMode == DisplayModeDark {
+					separatorColor = color.RGBA{R: 0xff, G: 0xff, B: 0xff, A: 0x10}
+				}
 				vector.StrokeLine(
 					screen,
-					float32(menuX)+4,
+					menuX+menuPadding,
 					float32(itemY+float64(menuItemHeight)),
-					float32(menuX+menuWidth)-4,
+					menuX+float32(menuWidth)-menuPadding,
 					float32(itemY+float64(menuItemHeight)),
 					1,
-					borderColor,
+					separatorColor,
 					false,
 				)
 			}
 		}
 
 		// Handle menu item click
-		if float64(g.releaseX) >= menuX && float64(g.releaseX) <= menuX+menuWidth {
-			itemIdx := (float64(g.releaseY) - menuY) / float64(menuItemHeight)
+		if float64(g.releaseX) >= float64(menuX) && float64(g.releaseX) <= float64(menuX)+menuWidth {
+			itemIdx := (float64(g.releaseY) - float64(menuY)) / float64(menuItemHeight)
 			if itemIdx >= 0 && itemIdx < float64(len(menuItems)) {
 				switch int(itemIdx) {
 				case 0: // Copy game link
@@ -779,6 +803,19 @@ func getTextSize(scoreMsg string, face font.Face) (fixed.Int26_6, fixed.Int26_6)
 // Layout returns the logical screen dimensions. The game window will scale to fit this size.
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 	return boardWidth, topAreaHeight + boardHeight + bottomAreaHeight
+}
+
+// drawRoundedRect draws a filled rectangle with rounded corners
+func drawRoundedRect(screen *ebiten.Image, x, y, width, height, radius float32, clr color.Color) {
+	// Draw the main body rectangles
+	vector.DrawFilledRect(screen, x+radius, y, width-2*radius, height, clr, false)
+	vector.DrawFilledRect(screen, x, y+radius, width, height-2*radius, clr, false)
+
+	// Draw the four corner circles
+	vector.DrawFilledCircle(screen, x+radius, y+radius, radius, clr, false)
+	vector.DrawFilledCircle(screen, x+width-radius, y+radius, radius, clr, false)
+	vector.DrawFilledCircle(screen, x+radius, y+height-radius, radius, clr, false)
+	vector.DrawFilledCircle(screen, x+width-radius, y+height-radius, radius, clr, false)
 }
 
 func (g *Game) drawSplash(screen *ebiten.Image) {
