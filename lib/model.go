@@ -15,6 +15,7 @@ const (
 	Unchosen
 	Hovering
 	CantMove
+	Corrupted
 )
 
 const BoardSize = 8

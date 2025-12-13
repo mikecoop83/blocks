@@ -21,15 +21,16 @@ import (
 )
 
 var (
-	offWhite    = color.RGBA{R: 0xf0, G: 0xf0, B: 0xf0, A: 0xff}
-	green       = color.RGBA{R: 0x00, G: 0xcc, B: 0x66, A: 0xff}
-	red         = color.RGBA{R: 0xff, G: 0x66, B: 0x66, A: 0xff}
-	blue        = color.RGBA{R: 0x66, G: 0x99, B: 0xff, A: 0xff}
-	orange      = color.RGBA{R: 0xff, G: 0xa5, B: 0x00, A: 0xff}
-	gray        = color.RGBA{R: 0x80, G: 0x80, B: 0x80, A: 0xff}
-	darkGray    = color.RGBA{R: 0x40, G: 0x40, B: 0x40, A: 0xff}
-	paleYellow  = color.RGBA{R: 0xff, G: 0xff, B: 0xcc, A: 0xff}
-	reddishGray = color.RGBA{R: 0x99, G: 0x66, B: 0x66, A: 0xff}
+	offWhite      = color.RGBA{R: 0xf0, G: 0xf0, B: 0xf0, A: 0xff}
+	green         = color.RGBA{R: 0x00, G: 0xcc, B: 0x66, A: 0xff}
+	red           = color.RGBA{R: 0xff, G: 0x66, B: 0x66, A: 0xff}
+	blue          = color.RGBA{R: 0x66, G: 0x99, B: 0xff, A: 0xff}
+	orange        = color.RGBA{R: 0xff, G: 0xa5, B: 0x00, A: 0xff}
+	gray          = color.RGBA{R: 0x80, G: 0x80, B: 0x80, A: 0xff}
+	darkGray      = color.RGBA{R: 0x40, G: 0x40, B: 0x40, A: 0xff}
+	paleYellow    = color.RGBA{R: 0xff, G: 0xff, B: 0xcc, A: 0xff}
+	reddishGray   = color.RGBA{R: 0x99, G: 0x66, B: 0x66, A: 0xff}
+	corruptPurple = color.RGBA{R: 0x2d, G: 0x0a, B: 0x2d, A: 0xff}
 )
 
 const (
@@ -70,25 +71,27 @@ var displayModeToForegroundColor = map[DisplayMode]color.Color{
 }
 
 var cellStateToColor = map[lib.CellState]color.Color{
-	lib.Empty:    offWhite,
-	lib.Pending:  green,
-	lib.Invalid:  red,
-	lib.FullLine: orange,
-	lib.Occupied: blue,
-	lib.Unchosen: gray,
-	lib.Hovering: paleYellow,
-	lib.CantMove: red,
+	lib.Empty:     offWhite,
+	lib.Pending:   green,
+	lib.Invalid:   red,
+	lib.FullLine:  orange,
+	lib.Occupied:  blue,
+	lib.Unchosen:  gray,
+	lib.Hovering:  paleYellow,
+	lib.CantMove:  red,
+	lib.Corrupted: corruptPurple,
 }
 
 var darkCellStateToColor = map[lib.CellState]color.Color{
-	lib.Empty:    darkGray,
-	lib.Pending:  green,
-	lib.Invalid:  red,
-	lib.FullLine: orange,
-	lib.Occupied: blue,
-	lib.Unchosen: gray,
-	lib.Hovering: paleYellow,
-	lib.CantMove: red,
+	lib.Empty:     darkGray,
+	lib.Pending:   green,
+	lib.Invalid:   red,
+	lib.FullLine:  orange,
+	lib.Occupied:  blue,
+	lib.Unchosen:  gray,
+	lib.Hovering:  paleYellow,
+	lib.CantMove:  red,
+	lib.Corrupted: corruptPurple,
 }
 var commaFormatter = message.NewPrinter(language.English)
 
@@ -139,11 +142,21 @@ type Game struct {
 	splashStart time.Time
 
 	// Menu state
-	menuOpen bool
+	menuOpen   bool
+	creepyMode bool
 
 	// Flash message state
 	flashMessage     string
 	flashMessageTime time.Time
+
+	// Screen flicker state
+	flickerUntil time.Time
+
+	// Corruption state
+	corruption           [lib.BoardSize][lib.BoardSize]bool
+	corruptionLevel      int // Number of corrupted cells
+	corruptionStartTime  time.Time
+	lastCorruptionSpread time.Time
 }
 
 func (g *Game) Reset(gameID uint64) {
@@ -162,9 +175,20 @@ func (g *Game) Reset(gameID uint64) {
 		slog.Error("error loading display mode", err)
 	}
 	g.displayMode = nameToDisplayMode[displayModeText]
+	creepyModeText, err := persist.Load("creepymode")
+	if err != nil {
+		slog.Error("error loading creepy mode", err)
+	}
+	g.creepyMode = creepyModeText == "on"
 	g.gameID = gameID
 	g.randSource = rand.NewSource(int64(g.gameID))
 	g.updateGameID(g.gameID)
+
+	// Initialize corruption - starts empty, will spawn from top-right corner
+	g.corruption = [lib.BoardSize][lib.BoardSize]bool{}
+	g.corruptionLevel = 0
+	g.corruptionStartTime = time.Now()
+	g.lastCorruptionSpread = time.Now()
 }
 
 func New(gameID uint64, updateGameID func(gameID uint64)) ebiten.Game {
@@ -183,6 +207,81 @@ func (g *Game) chosenPiece() *lib.Piece {
 		return nil
 	}
 	return g.pieceOptions[g.chosenPieceIdx]
+}
+
+// spreadCorruption spreads corruption to adjacent cells
+func (g *Game) spreadCorruption() {
+	// Find all cells adjacent to corrupted cells that aren't corrupted yet
+	candidates := make([]lib.Location, 0)
+	for r := range lib.BoardSize {
+		for c := range lib.BoardSize {
+			if g.corruption[r][c] {
+				continue // Already corrupted
+			}
+			// Check if any neighbor is corrupted
+			for dr := -1; dr <= 1; dr++ {
+				for dc := -1; dc <= 1; dc++ {
+					if dr == 0 && dc == 0 {
+						continue
+					}
+					nr, nc := r+dr, c+dc
+					if nr >= 0 && nr < lib.BoardSize && nc >= 0 && nc < lib.BoardSize {
+						if g.corruption[nr][nc] {
+							candidates = append(candidates, lib.Location{R: r, C: c})
+							goto nextCell
+						}
+					}
+				}
+			}
+		nextCell:
+		}
+	}
+
+	// Spread to 1-2 random candidates
+	if len(candidates) > 0 {
+		numToSpread := 1
+		if len(candidates) > 3 {
+			numToSpread = 2
+		}
+		for i := 0; i < numToSpread && len(candidates) > 0; i++ {
+			idx := g.randSource.Int63() % int64(len(candidates))
+			loc := candidates[idx]
+			g.corruption[loc.R][loc.C] = true
+			g.corruptionLevel++
+			// Remove from candidates
+			candidates[idx] = candidates[len(candidates)-1]
+			candidates = candidates[:len(candidates)-1]
+		}
+	}
+}
+
+// reduceCorruption removes corruption cells (called when lines are cleared)
+func (g *Game) reduceCorruption(numLines int) {
+	// Remove corruption from the edges (furthest from origin)
+	cellsToRemove := numLines * 3 // Each cleared line removes 3 corruption cells
+
+	for i := 0; i < cellsToRemove && g.corruptionLevel > 0; i++ {
+		// Find the corrupted cell furthest from origin (top-right)
+		var furthestR, furthestC int
+		furthestDist := -1
+		for r := range lib.BoardSize {
+			for c := range lib.BoardSize {
+				if !g.corruption[r][c] {
+					continue
+				}
+				// Distance from top-right corner
+				dist := r + (lib.BoardSize - 1 - c)
+				if dist > furthestDist {
+					furthestDist = dist
+					furthestR, furthestC = r, c
+				}
+			}
+		}
+		if furthestDist >= 0 {
+			g.corruption[furthestR][furthestC] = false
+			g.corruptionLevel--
+		}
+	}
 }
 
 // Update is called every tick (1/60 seconds by default) to tick the game state.
@@ -303,6 +402,43 @@ func (g *Game) Update() error {
 			}
 		}
 	}
+
+	// Creepy mode: corruption and flicker
+	if g.creepyMode {
+		// Spread corruption every 5 seconds, but wait 10 seconds before starting
+		if !g.gameOver && time.Since(g.corruptionStartTime) > 10*time.Second {
+			if time.Since(g.lastCorruptionSpread) > 5*time.Second {
+				// Seed first corruption cell from top-right corner
+				if g.corruptionLevel == 0 {
+					g.corruption[0][lib.BoardSize-1] = true
+					g.corruptionLevel = 1
+				} else {
+					g.spreadCorruption()
+				}
+				g.lastCorruptionSpread = time.Now()
+			}
+
+			// Check if corruption has taken over (more than half the board)
+			if g.corruptionLevel > (lib.BoardSize*lib.BoardSize)/2 {
+				g.gameOver = true
+			}
+		}
+
+		// Random screen flicker - more likely as corruption grows
+		if g.corruptionLevel > 1 && g.flickerUntil.Before(time.Now()) {
+			// Chance increases with corruption (0.1% base + 0.05% per corruption cell)
+			flickerChance := int64(1000 - g.corruptionLevel*5)
+			if flickerChance < 100 {
+				flickerChance = 100
+			}
+			if g.randSource.Int63()%flickerChance == 0 {
+				// Flicker for 50-150ms
+				flickerDuration := time.Duration(50+g.randSource.Int63()%100) * time.Millisecond
+				g.flickerUntil = time.Now().Add(flickerDuration)
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -333,6 +469,32 @@ func (g *Game) drawGame(screen *ebiten.Image) {
 	g.drawPieceOptions(screen)
 
 	g.drawHeader(screen)
+
+	// Draw screen flicker effect (creepy mode only)
+	if g.creepyMode && time.Now().Before(g.flickerUntil) {
+		// Randomly choose flicker type
+		flickerType := g.randSource.Int63() % 3
+		var flickerColor color.RGBA
+		switch flickerType {
+		case 0:
+			// Dark flash
+			flickerColor = color.RGBA{R: 0x00, G: 0x00, B: 0x00, A: 0x60}
+		case 1:
+			// Red tint
+			flickerColor = color.RGBA{R: 0x40, G: 0x00, B: 0x00, A: 0x40}
+		case 2:
+			// Static/white noise flash
+			flickerColor = color.RGBA{R: 0x80, G: 0x80, B: 0x80, A: 0x30}
+		}
+		vector.DrawFilledRect(
+			screen,
+			0, 0,
+			float32(screen.Bounds().Max.X),
+			float32(screen.Bounds().Max.Y),
+			flickerColor,
+			false,
+		)
+	}
 }
 
 func (g *Game) drawPieceOptions(screen *ebiten.Image) {
@@ -497,6 +659,10 @@ func (g *Game) drawBoard(screen *ebiten.Image) {
 					animationTime: 1 * time.Second,
 				}
 			}
+			// Push back corruption when lines are cleared
+			if numClearedLines > 0 {
+				g.reduceCorruption(numClearedLines)
+			}
 			g.score += int64(numPoints)
 			if !g.cheating {
 				g.pieceOptions[g.chosenPieceIdx] = nil
@@ -526,6 +692,24 @@ func (g *Game) drawBoard(screen *ebiten.Image) {
 				displayColor,
 				false,
 			)
+			// Overlay corruption effect (semi-transparent) on corrupted cells
+			if g.creepyMode && g.corruption[r][c] {
+				// Draw corruption overlay - darker for empty cells, lighter tint for pieces
+				var corruptOverlay color.RGBA
+				if state == lib.Empty {
+					corruptOverlay = color.RGBA{R: 0x2d, G: 0x0a, B: 0x2d, A: 0xc0}
+				} else {
+					// Lighter overlay so pieces are still visible
+					corruptOverlay = color.RGBA{R: 0x2d, G: 0x0a, B: 0x2d, A: 0x60}
+				}
+				vector.DrawFilledRect(
+					screen,
+					float32(c*cellSize), float32(topAreaHeight+r*cellSize),
+					cellSize, cellSize,
+					corruptOverlay,
+					false,
+				)
+			}
 		}
 	}
 }
@@ -642,7 +826,11 @@ func (g *Game) drawHeader(screen *ebiten.Image) {
 
 	// Draw menu if open
 	if g.menuOpen {
-		menuItems := []string{"Copy game link", "Retry game", "New game"}
+		creepyLabel := "[  ] Creepy Mode"
+		if g.creepyMode {
+			creepyLabel = "[X] Creepy Mode"
+		}
+		menuItems := []string{"Copy game link", "Retry game", "New game", creepyLabel}
 		menuX := float32(boardWidth - int(menuWidth) - 16)
 		menuY := float32(topAreaHeight + 8)
 		menuHeight := float32(len(menuItems) * menuItemHeight)
@@ -681,7 +869,9 @@ func (g *Game) drawHeader(screen *ebiten.Image) {
 				if g.displayMode == DisplayModeDark {
 					hoverBgColor = color.RGBA{R: 0xff, G: 0xff, B: 0xff, A: 0x0a}
 				}
-				vector.DrawFilledRect(screen, menuX, float32(itemY), float32(menuWidth), float32(menuItemHeight), hoverBgColor, false)
+				vector.DrawFilledRect(
+					screen, menuX, float32(itemY), float32(menuWidth), float32(menuItemHeight), hoverBgColor, false,
+				)
 			}
 
 			_, textHeight := getTextSize(item, resources.MenuFontFace)
@@ -732,6 +922,19 @@ func (g *Game) drawHeader(screen *ebiten.Image) {
 					g.Reset(g.gameID)
 				case 2: // New game
 					g.Reset(rand.Uint64())
+				case 3: // Toggle creepy mode
+					g.creepyMode = !g.creepyMode
+					creepyValue := "off"
+					if g.creepyMode {
+						creepyValue = "on"
+					}
+					if err := persist.Store("creepymode", creepyValue); err != nil {
+						slog.Error("error storing creepy mode", err)
+					}
+					// Reset corruption state when toggling
+					g.corruption = [lib.BoardSize][lib.BoardSize]bool{}
+					g.corruptionLevel = 0
+					g.corruptionStartTime = time.Now()
 				}
 				g.menuOpen = false
 				g.releaseX, g.releaseY = -1, -1
