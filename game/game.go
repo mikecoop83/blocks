@@ -239,11 +239,16 @@ func (g *Game) spreadCorruption() {
 		}
 	}
 
-	// Spread to 1-2 random candidates
+	// Spread to more cells as corruption grows
 	if len(candidates) > 0 {
-		numToSpread := 1
-		if len(candidates) > 3 {
-			numToSpread = 2
+		// Start with 1 cell, add 1 more cell for every 10 corruption cells, max 5
+		numToSpread := 1 + g.corruptionLevel/10
+		if numToSpread > 5 {
+			numToSpread = 5
+		}
+		// Don't spread more than available candidates
+		if numToSpread > len(candidates) {
+			numToSpread = len(candidates)
 		}
 		for i := 0; i < numToSpread && len(candidates) > 0; i++ {
 			idx := g.randSource.Int63() % int64(len(candidates))
@@ -407,9 +412,16 @@ func (g *Game) Update() error {
 
 	// Creepy mode: corruption and flicker
 	if g.creepyMode {
-		// Spread corruption every 5 seconds, but wait 10 seconds before starting
+		// Spread corruption with increasing frequency, but wait 10 seconds before starting
 		if !g.gameOver && time.Since(g.corruptionStartTime) > 10*time.Second {
-			if time.Since(g.lastCorruptionSpread) > 5*time.Second {
+			// Spread interval decreases as corruption grows (5s -> 1s)
+			// Base interval is 5s, reduced by 100ms per corruption cell, minimum 1s
+			spreadInterval := 5*time.Second - time.Duration(g.corruptionLevel*100)*time.Millisecond
+			if spreadInterval < 1*time.Second {
+				spreadInterval = 1 * time.Second
+			}
+
+			if time.Since(g.lastCorruptionSpread) > spreadInterval {
 				// Seed first corruption cell from top-right corner
 				if g.corruptionLevel == 0 {
 					g.corruption[0][lib.BoardSize-1] = true
@@ -421,7 +433,7 @@ func (g *Game) Update() error {
 			}
 
 			// Check if corruption has taken over (more than half the board)
-			if g.corruptionLevel > (lib.BoardSize*lib.BoardSize)/2 {
+			if g.corruptionLevel > (lib.BoardSize*lib.BoardSize)*0.75 {
 				g.gameOver = true
 				g.corruptionGameOver = true
 			}
